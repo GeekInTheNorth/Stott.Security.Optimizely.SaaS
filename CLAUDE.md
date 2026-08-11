@@ -81,11 +81,32 @@ which is worse than reporting nothing. Regression tests guard this.
 spans several `Content-Security-Policy` headers; treating it as a replacement
 would discard all but the last.
 
+**A header name is chosen once.** The add dialog is the only place a custom name
+is entered; from then on it is as fixed as one of the standard eight, and every
+card shows its name read-only. Renaming a live header is a delete plus an add —
+two publishes on a customer's site — and a text field makes that look like one
+harmless edit. `isCustomHeader` on `HeaderRowModel` says a name is the customer's,
+not that it can be edited; it is what decides deletability and whether there is
+metadata to show.
+
+**The headers tab reconciles rows by id, not by name.** `rows` comes from the
+backend — it is what knows which headers are standard — and reflects the *stored*
+draft, so `ResponseHeaders` overlays the local draft on top of it and appends
+anything added since the load. Matching uses `CustomHeaderConfig.id`, the identity
+the edit and delete handlers key on; materialised rows have no id and fall back to
+the name.
+
 **Validation guards storage.** `CompiledHeaders` serves stored output without
 re-validating, and import accepts arbitrary pasted JSON, so `lib/validation.ts`
 is the only thing between a customer and a malformed header reaching a live
-site. It rejects non-token header names and control characters for exactly this
-reason — response splitting.
+site. It also rejects a source with no directives, which is why both source
+dialogs insist on one: a directive-less source would leave a draft that cannot be
+saved, reported by the server rather than the field that caused it. It rejects
+non-token header names and control characters for exactly this
+reason — response splitting. Those two rules live in `shared/header-rules.ts`
+because the console applies them to a custom header name as it is typed; the
+backend is still what enforces them, and both halves must reject the same thing
+or the console will build a document that the save refuses.
 
 **Nonce and strict-dynamic are *sources*, not settings.** They are granted to
 directives like any other source. The `IsNonceEnabled` booleans in the PaaS

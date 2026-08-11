@@ -17,8 +17,7 @@ import {
 } from '../../shared/config.js';
 import {
   STANDARD_HEADERS,
-  findStandardHeader,
-  isFixedHeader,
+  toConfiguredRow,
   toDefaultRow,
   type HeaderRowModel
 } from '../../shared/standard-headers.js';
@@ -39,22 +38,6 @@ export function listHeaderRows(headers: readonly CustomHeaderConfig[]): HeaderRo
   ).map(toDefaultRow);
 
   return [...configured, ...defaults];
-}
-
-function toConfiguredRow(header: CustomHeaderConfig): HeaderRowModel {
-  const definition = findStandardHeader(header.headerName);
-
-  return {
-    id: header.id,
-    headerName: header.headerName,
-    headerValue: header.headerValue,
-    behavior: header.behavior,
-    ...(definition?.description ? { description: definition.description } : {}),
-    ...(definition?.allowedValues ? { allowedValues: definition.allowedValues } : {}),
-    propertyType: definition?.propertyType ?? 'string',
-    isHeaderNameEditable: !isFixedHeader(header.headerName),
-    canDelete: true
-  };
 }
 
 /**

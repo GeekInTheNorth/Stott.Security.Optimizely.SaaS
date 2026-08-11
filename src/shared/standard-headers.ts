@@ -13,7 +13,11 @@
  * `propertyType` already drives.
  */
 
-import { CustomHeaderBehavior, type CustomHeaderBehaviorValue } from './config.js';
+import {
+  CustomHeaderBehavior,
+  type CustomHeaderBehaviorValue,
+  type CustomHeaderConfig
+} from './config.js';
 
 export const StandardHeaderNames = {
   XssProtection: 'X-Xss-Protection',
@@ -202,9 +206,42 @@ export interface HeaderRowModel {
   readonly description?: string;
   readonly allowedValues?: readonly AllowedValue[];
   readonly propertyType: HeaderPropertyType;
-  readonly isHeaderNameEditable: boolean;
+  /**
+   * A name the customer chose rather than one of the standard eight. Named for
+   * what it is, not for an affordance: PaaS calls the equivalent field
+   * `IsHeaderNameEditable`, but a name here is chosen once when the header is
+   * added and immutable thereafter, exactly like a standard one. What varies is
+   * whether the row can be deleted and whether it has metadata to show.
+   */
+  readonly isCustomHeader: boolean;
   /** False for unconfigured standard headers — there is nothing stored to delete. */
   readonly canDelete: boolean;
+}
+
+/**
+ * A header the customer has configured, enriched with whatever standard-header
+ * metadata its name attracts. A custom name matches nothing, so it gets a free
+ * text value editor and no description — which is precisely what a header of the
+ * customer's own choosing needs.
+ *
+ * Shared rather than backend-only because the console needs the same row for a
+ * custom header added since the draft loaded: the backend has not seen it yet,
+ * and a second, subtly different row model in the browser is how the two drift.
+ */
+export function toConfiguredRow(header: CustomHeaderConfig): HeaderRowModel {
+  const definition = findStandardHeader(header.headerName);
+
+  return {
+    id: header.id,
+    headerName: header.headerName,
+    headerValue: header.headerValue,
+    behavior: header.behavior,
+    ...(definition?.description ? { description: definition.description } : {}),
+    ...(definition?.allowedValues ? { allowedValues: definition.allowedValues } : {}),
+    propertyType: definition?.propertyType ?? 'string',
+    isCustomHeader: !isFixedHeader(header.headerName),
+    canDelete: true
+  };
 }
 
 /**
@@ -219,7 +256,7 @@ export function toDefaultRow(definition: StandardHeaderDefinition): HeaderRowMod
     description: definition.description,
     ...(definition.allowedValues ? { allowedValues: definition.allowedValues } : {}),
     propertyType: definition.propertyType,
-    isHeaderNameEditable: false,
+    isCustomHeader: false,
     canDelete: false
   };
 }

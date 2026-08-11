@@ -13,6 +13,11 @@
  * descriptions is more vertical space than a card can open inline without
  * pushing every other source off screen, and it makes card heights wildly
  * uneven — which is also what would stop them sitting side by side.
+ *
+ * Adding a source uses the same dialog shape, from a button beside the filter,
+ * and collects the directives at the same time. A source with none is rejected by
+ * `validateConfig`, so adding one on its own would leave a draft that cannot be
+ * saved.
  */
 
 import { useMemo, useState } from 'react';
@@ -37,7 +42,7 @@ import {
   Text
 } from '@optiaxiom/react';
 
-import { Notice, Section } from './ui.js';
+import { Notice } from './ui.js';
 import { DIRECTIVE_DESCRIPTIONS } from './directives.js';
 import './card-grid.css';
 
@@ -89,43 +94,47 @@ export function CspSources({
   config: ConfigDocument;
   onChange: (mutate: (current: ConfigDocument) => ConfigDocument) => void;
 }): React.JSX.Element {
-  const [draftSource, setDraftSource] = useState('');
   const [filter, setFilter] = useState('');
   /** Which source's directive dialog is open, if any. */
   const [editing, setEditing] = useState<string | undefined>(undefined);
 
+  /**
+   * Sources matching the filter, by domain **or** by directive.
+   *
+   * Directives matter as much as domains here: the model is domain-first, so the
+   * answer to "what is allowed to run scripts?" is scattered across every card,
+   * and typing `script-src` is the only way to gather it.
+   */
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
 
-    return needle
-      ? config.sources.filter((s) => s.source.toLowerCase().includes(needle))
-      : config.sources;
+    if (needle.length === 0) {
+      return config.sources;
+    }
+
+    return config.sources.filter(
+      (source) =>
+        source.source.toLowerCase().includes(needle) ||
+        source.directives.some((directive) => directive.toLowerCase().includes(needle))
+    );
   }, [config.sources, filter]);
 
-  const addSource = (): void => {
-    const source = draftSource.trim();
-    if (source.length === 0) {
-      return;
-    }
+  const takenSources = useMemo(
+    () => new Set(config.sources.map((source) => source.source.trim().toLowerCase())),
+    [config.sources]
+  );
 
-    const exists = config.sources.some((s) => s.source.toLowerCase() === source.toLowerCase());
-    if (exists) {
-      setFilter(source);
-      setDraftSource('');
-      return;
-    }
-
-    const id = `src-${Date.now().toString(36)}`;
+  const addSource = (source: string, directives: readonly string[]): void => {
     onChange((current) => ({
       ...current,
       // New sources go first — otherwise adding one to a long list appears to
       // do nothing until you scroll.
-      sources: [{ id, source, directives: [] }, ...current.sources]
+      sources: [{ id: `src-${Date.now().toString(36)}`, source, directives }, ...current.sources]
     }));
-    setDraftSource('');
-    // Open straight into the directive picker: a source with no directives is
-    // not emitted, so adding one is only half the job.
-    setEditing(id);
+
+    // A filter that does not match the new source would hide the card that was
+    // just created, which reads as the dialog having done nothing.
+    setFilter('');
   };
 
   const updateSource = (id: string, patch: Partial<CspSourceConfig>): void =>
@@ -138,43 +147,7 @@ export function CspSources({
     onChange((current) => ({ ...current, sources: current.sources.filter((s) => s.id !== id) }));
 
   return (
-    <Group flexDirection="column" gap="20">
-      <Section
-        title="Add a source"
-        description="A domain, a scheme such as data:, or a keyword such as 'self'."
-      >
-        <Group gap="8" alignItems="end" flexWrap="wrap">
-          {/* At least half the row, never wider than 400px. */}
-          <Box flex="1" style={{ minWidth: '50%', maxWidth: '400px' }}>
-            <Field label="Source">
-              <Input
-                value={draftSource}
-                placeholder="https://cdn.example.com"
-                onChange={(event) => setDraftSource(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    addSource();
-                  }
-                }}
-                list="csp-keyword-suggestions"
-              />
-            </Field>
-          </Box>
-          <datalist id="csp-keyword-suggestions">
-            {KEYWORD_SUGGESTIONS.map((suggestion) => (
-              <option key={suggestion.value} value={suggestion.value}>
-                {suggestion.label}
-              </option>
-            ))}
-          </datalist>
-
-          <Button appearance="primary" onClick={addSource} disabled={draftSource.trim().length === 0}>
-            Add
-          </Button>
-        </Group>
-      </Section>
-
+    <Group flexDirection="column" gap="16">
       {config.sources.some((source) => source.source === Sources.Nonce) && (
         <Notice intent="warning" title="Your front end must apply the nonce.">
           The published policy carries a placeholder that your front end must replace with a
@@ -183,48 +156,184 @@ export function CspSources({
         </Notice>
       )}
 
-      <Section title={`Sources (${config.sources.length})`}>
-        {config.sources.length > 3 && (
-          <Box maxW="sm">
-            <Field label="Filter">
-              <SearchInput
-                value={filter}
-                onValueChange={setFilter}
-                placeholder="Domain or keyword"
-              />
-            </Field>
-          </Box>
-        )}
-
-        {config.sources.length === 0 && (
-          <Text color="fg.tertiary">
-            No sources yet. Until at least one source, the sandbox, or
-            upgrade-insecure-requests is configured, no policy is emitted.
-          </Text>
-        )}
-
-        {/* A CSS grid rather than Axiom's Grid: the two-column rule is a 1440px
-            breakpoint, and Axiom's responsive props only offer 600px and 900px.
-            See card-grid.css. */}
-        <Box className="stott-card-grid">
-          {visible.map((source) => (
-            <SourceCard
-              key={source.id}
-              source={source}
-              editing={editing === source.id}
-              onEdit={() => setEditing(source.id)}
-              onCloseEdit={() => setEditing(undefined)}
-              onChange={(patch) => updateSource(source.id, patch)}
-              onRemove={() => removeSource(source.id)}
+      {/* The filter is always shown, even for a handful of sources: it carries the
+          add button, which must not disappear with it. */}
+      <Group gap="8" alignItems="end" flexWrap="wrap">
+        <Box flex="1">
+          <Field label="Filter" w="full">
+            <SearchInput
+              value={filter}
+              onValueChange={setFilter}
+              placeholder="Domain, keyword or directive"
+              w="full"
             />
-          ))}
+          </Field>
         </Box>
 
-        {visible.length === 0 && config.sources.length > 0 && (
-          <Text color="fg.tertiary">No sources match “{filter}”.</Text>
-        )}
-      </Section>
+        <AddSource takenSources={takenSources} onAdd={addSource} />
+      </Group>
+
+      {config.sources.length === 0 && (
+        <Text color="fg.tertiary">
+          No sources yet. Until at least one source, the sandbox, or
+          upgrade-insecure-requests is configured, no policy is emitted.
+        </Text>
+      )}
+
+      {/* A CSS grid rather than Axiom's Grid: the two-column rule is a 1440px
+          breakpoint, and Axiom's responsive props only offer 600px and 900px.
+          See card-grid.css. */}
+      <Box className="stott-card-grid">
+        {visible.map((source) => (
+          <SourceCard
+            key={source.id}
+            source={source}
+            editing={editing === source.id}
+            onEdit={() => setEditing(source.id)}
+            onCloseEdit={() => setEditing(undefined)}
+            onChange={(patch) => updateSource(source.id, patch)}
+            onRemove={() => removeSource(source.id)}
+          />
+        ))}
+      </Box>
+
+      {visible.length === 0 && config.sources.length > 0 && (
+        <Text color="fg.tertiary">No sources match “{filter}”.</Text>
+      )}
     </Group>
+  );
+}
+
+/**
+ * The call to action, and the dialog it opens.
+ *
+ * The form is mounted only while the dialog is open, so it starts empty on each
+ * open with no effect needed to reset it — the same split as `DirectiveDialog`
+ * below, for the same reason.
+ */
+function AddSource({
+  takenSources,
+  onAdd
+}: {
+  takenSources: ReadonlySet<string>;
+  onAdd: (source: string, directives: readonly string[]) => void;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button appearance="primary" onClick={() => setOpen(true)}>
+        Add source
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent size="lg">
+          {open && (
+            <AddSourceForm
+              takenSources={takenSources}
+              onCancel={() => setOpen(false)}
+              onAdd={(source, directives) => {
+                onAdd(source, directives);
+                setOpen(false);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function AddSourceForm({
+  takenSources,
+  onCancel,
+  onAdd
+}: {
+  takenSources: ReadonlySet<string>;
+  onCancel: () => void;
+  onAdd: (source: string, directives: readonly string[]) => void;
+}): React.JSX.Element {
+  const [source, setSource] = useState('');
+  const [selected, setSelected] = useState<readonly string[]>([]);
+  const [sourceError, setSourceError] = useState<string | undefined>(undefined);
+  const [directiveError, setDirectiveError] = useState<string | undefined>(undefined);
+
+  const submit = (): void => {
+    const value = source.trim();
+    const problem = describeSourceProblem(value, takenSources);
+    // A source with no directives is rejected by `validateConfig`, so adding one
+    // would leave a draft that cannot be saved.
+    const directiveProblem =
+      selected.length === 0 ? 'Choose at least one thing this source is permitted to do.' : undefined;
+
+    setSourceError(problem);
+    setDirectiveError(directiveProblem);
+
+    if (problem !== undefined || directiveProblem !== undefined) {
+      return;
+    }
+
+    onAdd(value, selected);
+  };
+
+  return (
+    <>
+      <DialogHeader description="A domain, a scheme such as data:, or a keyword such as 'self'.">
+        Add a source
+      </DialogHeader>
+
+      <DialogBody>
+        <Group flexDirection="column" gap="16" w="full">
+          <Field label="Source" error={sourceError} w="full">
+            <Input
+              value={source}
+              error={sourceError !== undefined}
+              w="full"
+              placeholder="https://cdn.example.com"
+              list="csp-keyword-suggestions"
+              onValueChange={(value) => {
+                setSource(value);
+                setSourceError(undefined);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  submit();
+                }
+              }}
+            />
+          </Field>
+
+          <datalist id="csp-keyword-suggestions">
+            {KEYWORD_SUGGESTIONS.map((suggestion) => (
+              <option key={suggestion.value} value={suggestion.value}>
+                {suggestion.label}
+              </option>
+            ))}
+          </datalist>
+
+          <Field error={directiveError} w="full">
+            <DirectiveChecklist
+              source={source.trim()}
+              selected={selected}
+              onToggle={(directive, granted) => {
+                setSelected((current) =>
+                  granted ? [...current, directive] : current.filter((d) => d !== directive)
+                );
+                setDirectiveError(undefined);
+              }}
+            />
+          </Field>
+        </Group>
+      </DialogBody>
+
+      <DialogFooter>
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button appearance="primary" onClick={submit} disabled={source.trim().length === 0}>
+          Add source
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
 
@@ -245,39 +354,51 @@ function SourceCard({
 }): React.JSX.Element {
   return (
     <Card p="16">
-      <Group gap="12" alignItems="center" flexWrap="wrap">
-        <Code flex="1" fontWeight="600" style={{ wordBreak: 'break-all' }}>
-          {source.source}
-        </Code>
+      {/* `w="full"` on the stack: without it the column is only as wide as its
+          widest child, which leaves a short source name in a card of empty space
+          and the buttons stranded in the middle of it. */}
+      <Group flexDirection="column" gap="8" w="full">
+        <Box>
+          <Code fontWeight="600" style={{ wordBreak: 'break-all' }}>
+            {source.source}
+          </Code>
 
-        <Text color="fg.tertiary">
-          {source.directives.length === 0
-            ? 'No directives — not emitted'
-            : `${source.directives.length} directive${source.directives.length === 1 ? '' : 's'}`}
-        </Text>
+          <Text color="fg.tertiary" mt="4">
+            {source.directives.length === 0
+              ? 'No directives — not emitted'
+              : `${source.directives.length} directive${source.directives.length === 1 ? '' : 's'}`}
+          </Text>
+        </Box>
 
-        <Button onClick={onEdit}>Edit</Button>
-        <Button
-          appearance="danger-outline"
-          onClick={onRemove}
-          aria-label={`Remove ${source.source}`}
-        >
-          Remove
-        </Button>
+        {source.directives.length > 0 && (
+          <Text color="fg.tertiary" style={{ wordBreak: 'break-all' }}>
+            {source.directives.join(', ')}
+          </Text>
+        )}
+
+        {/* Actions at the foot of the card, as on a response header card. Cards
+            sitting side by side vary in height with their directive lists, so
+            buttons on the top row land at a different place in each one. */}
+        <Group gap="8" mt="4" flexWrap="wrap">
+          <Button ml="auto" onClick={onEdit}>
+            Edit
+          </Button>
+          <Button
+            appearance="danger-outline"
+            onClick={onRemove}
+            aria-label={`Remove ${source.source}`}
+          >
+            Remove
+          </Button>
+        </Group>
+
+        <DirectiveDialog
+          source={source}
+          open={editing}
+          onOpenChange={(next) => (next ? onEdit() : onCloseEdit())}
+          onChange={onChange}
+        />
       </Group>
-
-      {source.directives.length > 0 && (
-        <Text color="fg.tertiary" mt="8" style={{ wordBreak: 'break-all' }}>
-          {source.directives.join(', ')}
-        </Text>
-      )}
-
-      <DirectiveDialog
-        source={source}
-        open={editing}
-        onOpenChange={(next) => (next ? onEdit() : onCloseEdit())}
-        onChange={onChange}
-      />
     </Card>
   );
 }
@@ -333,15 +454,19 @@ function DirectiveForm({
   onApply: (directives: readonly string[]) => void;
 }): React.JSX.Element {
   const [selected, setSelected] = useState<readonly string[]>(source.directives);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const toggleDirective = (directive: string, granted: boolean): void =>
-    setSelected((current) =>
-      granted ? [...current, directive] : current.filter((d) => d !== directive)
-    );
+  const apply = (): void => {
+    // Same rule as the add dialog: revoking everything leaves a source that
+    // `validateConfig` rejects, so it cannot be saved. Removing the source is
+    // what "allow nothing" means.
+    if (selected.length === 0) {
+      setError('Choose at least one directive, or remove the source entirely.');
+      return;
+    }
 
-  const isNone = source.source === Sources.None;
-  const isNonce = source.source === Sources.Nonce;
-  const isStrictDynamic = source.source === Sources.StrictDynamic;
+    onApply(selected);
+  };
 
   return (
     <>
@@ -350,63 +475,110 @@ function DirectiveForm({
       </DialogHeader>
 
       <DialogBody>
-        <Group flexDirection="column" gap="12">
-          {/* Mirrors the engine: 'none' wins outright for any directive it is
-              granted, discarding every other source for that directive. */}
-          {isNone && (
-            <Notice intent="warning" title="'none' overrides everything.">
-              Any directive granted here will permit nothing at all, regardless of other
-              sources.
-            </Notice>
-          )}
-
-          {isNonce && (
-            <Text color="fg.tertiary">
-              Grant this to <code>script-src</code> or <code>style-src</code> to allow inline
-              code carrying a matching nonce. The stored value is a placeholder — a real,
-              unguessable nonce is substituted on every request.
-            </Text>
-          )}
-
-          {isStrictDynamic && (
-            <Text color="fg.tertiary">
-              Lets a trusted script load further scripts, so host allow-lists can be dropped.
-              Only meaningful alongside a nonce, and modern browsers ignore host sources on
-              any directive that carries it.
-            </Text>
-          )}
-
-          <Box asChild>
-            <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-              <Text asChild fontWeight="600" mb="8">
-                <legend>Directives</legend>
-              </Text>
-              {/* A vertical list rather than a dense grid: the descriptions are
-                  what make the domain-based model approachable, and they need
-                  the room. The dialog is what affords that room. */}
-              <Group flexDirection="column" gap="8">
-                {DIRECTIVE_DESCRIPTIONS.map(({ directive, description }) => (
-                  <Checkbox
-                    key={directive}
-                    checked={selected.includes(directive)}
-                    description={description}
-                    onCheckedChange={(checked) => toggleDirective(directive, checked)}
-                  >
-                    {directive}
-                  </Checkbox>
-                ))}
-              </Group>
-            </fieldset>
-          </Box>
-        </Group>
+        <Field error={error} w="full">
+          <DirectiveChecklist
+            source={source.source}
+            selected={selected}
+            onToggle={(directive, granted) => {
+              setSelected((current) =>
+                granted ? [...current, directive] : current.filter((d) => d !== directive)
+              );
+              setError(undefined);
+            }}
+          />
+        </Field>
       </DialogBody>
 
       <DialogFooter>
         <Button onClick={onCancel}>Cancel</Button>
-        <Button appearance="primary" onClick={() => onApply(selected)}>
+        <Button appearance="primary" onClick={apply}>
           Save directives
         </Button>
       </DialogFooter>
     </>
   );
+}
+
+/**
+ * The checkbox list, plus whatever the source itself needs explaining.
+ *
+ * Shared by both dialogs so adding a source and editing one offer the same
+ * nineteen choices and the same warnings. `source` is a plain string rather than
+ * a `CspSourceConfig`: in the add dialog it is still being typed, and the notices
+ * should appear as soon as someone types `'none'`.
+ */
+function DirectiveChecklist({
+  source,
+  selected,
+  onToggle
+}: {
+  source: string;
+  selected: readonly string[];
+  onToggle: (directive: string, granted: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <Group flexDirection="column" gap="12" w="full">
+      {/* Mirrors the engine: 'none' wins outright for any directive it is
+          granted, discarding every other source for that directive. */}
+      {source === Sources.None && (
+        <Notice intent="warning" title="'none' overrides everything.">
+          Any directive granted here will permit nothing at all, regardless of other sources.
+        </Notice>
+      )}
+
+      {source === Sources.Nonce && (
+        <Text color="fg.tertiary">
+          Grant this to <code>script-src</code> or <code>style-src</code> to allow inline code
+          carrying a matching nonce. The stored value is a placeholder — a real, unguessable
+          nonce is substituted on every request.
+        </Text>
+      )}
+
+      {source === Sources.StrictDynamic && (
+        <Text color="fg.tertiary">
+          Lets a trusted script load further scripts, so host allow-lists can be dropped. Only
+          meaningful alongside a nonce, and modern browsers ignore host sources on any directive
+          that carries it.
+        </Text>
+      )}
+
+      <Box asChild>
+        <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+          <Text asChild fontWeight="600" mb="8">
+            <legend>Directives</legend>
+          </Text>
+          {/* A vertical list rather than a dense grid: the descriptions are
+              what make the domain-based model approachable, and they need
+              the room. The dialog is what affords that room. */}
+          <Group flexDirection="column" gap="8">
+            {DIRECTIVE_DESCRIPTIONS.map(({ directive, description }) => (
+              <Checkbox
+                key={directive}
+                checked={selected.includes(directive)}
+                description={description}
+                onCheckedChange={(checked) => onToggle(directive, checked)}
+              >
+                {directive}
+              </Checkbox>
+            ))}
+          </Group>
+        </fieldset>
+      </Box>
+    </Group>
+  );
+}
+
+function describeSourceProblem(
+  source: string,
+  takenSources: ReadonlySet<string>
+): string | undefined {
+  if (source.length === 0) {
+    return 'Enter a domain, scheme or keyword.';
+  }
+
+  if (takenSources.has(source.toLowerCase())) {
+    return 'This source is already listed.';
+  }
+
+  return undefined;
 }

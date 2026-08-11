@@ -18,8 +18,10 @@ import {
   STANDARD_HEADERS,
   StandardHeaderNames,
   getDefaultValue,
-  getPropertyType
+  getPropertyType,
+  toConfiguredRow
 } from '../shared/standard-headers.js';
+import { hasControlCharacters, isValidHeaderName } from '../shared/header-rules.js';
 import { compileCustomHeaders, listHeaderRows } from '../backend/core/headers.js';
 import { compileHeaders } from '../backend/core/index.js';
 
@@ -96,7 +98,7 @@ describe('listing rows for the console', () => {
     expect(rows.every((r) => r.behavior === CustomHeaderBehavior.Disabled)).toBe(true);
     // Nothing stored, so nothing to delete.
     expect(rows.every((r) => r.canDelete === false)).toBe(true);
-    expect(rows.every((r) => r.isHeaderNameEditable === false)).toBe(true);
+    expect(rows.every((r) => r.isCustomHeader === false)).toBe(true);
   });
 
   it('does not duplicate a standard header the customer has configured', () => {
@@ -114,11 +116,11 @@ describe('listing rows for the console', () => {
     expect(rows).toHaveLength(8);
   });
 
-  it('keeps custom headers editable and deletable, and carries no metadata', () => {
+  it('marks a custom header as custom and deletable, and carries no metadata', () => {
     const rows = listHeaderRows([header('X-Netcel-Trace', CustomHeaderBehavior.Add, 'on')]);
     const custom = rows.find((r) => r.headerName === 'X-Netcel-Trace');
 
-    expect(custom?.isHeaderNameEditable).toBe(true);
+    expect(custom?.isCustomHeader).toBe(true);
     expect(custom?.canDelete).toBe(true);
     expect(custom?.propertyType).toBe('string');
     expect(custom?.allowedValues).toBeUndefined();
@@ -132,9 +134,81 @@ describe('listing rows for the console', () => {
 
     expect(row?.description).toContain('Referrer-Policy');
     expect(row?.allowedValues?.length).toBe(8);
-    expect(row?.isHeaderNameEditable).toBe(false);
+    expect(row?.isCustomHeader).toBe(false);
     expect(row?.canDelete).toBe(true);
   });
+});
+
+/**
+ * The console builds these rows itself for a custom header added since the draft
+ * loaded — the backend has not seen it yet — so the shared helper has to produce
+ * the same row the backend would.
+ */
+describe('rows for a header the customer has configured', () => {
+  it('gives a custom name a free text value editor and no metadata', () => {
+    const row = toConfiguredRow(header('X-Netcel-Trace', CustomHeaderBehavior.Add, 'on'));
+
+    expect(row).toMatchObject({
+      headerName: 'X-Netcel-Trace',
+      headerValue: 'on',
+      behavior: CustomHeaderBehavior.Add,
+      propertyType: 'string',
+      isCustomHeader: true,
+      canDelete: true
+    });
+    expect(row.description).toBeUndefined();
+    expect(row.allowedValues).toBeUndefined();
+  });
+
+  it('recognises a standard header however it is cased', () => {
+    expect(toConfiguredRow(header('x-frame-options', CustomHeaderBehavior.Add, 'DENY'))).toMatchObject(
+      { propertyType: 'select', isCustomHeader: false }
+    );
+  });
+
+  // The console keys its edit and delete handlers on the id, and reconciles the
+  // backend's rows against the draft with it.
+  it('carries the id through as the row identity', () => {
+    const configured = header('X-Netcel-Trace', CustomHeaderBehavior.Add, 'on');
+
+    expect(toConfiguredRow(configured).id).toBe(configured.id);
+  });
+});
+
+/**
+ * The console applies these to a name as it is typed, and the backend applies the
+ * same ones on save. They are shared precisely so the two cannot disagree.
+ */
+describe('header rules', () => {
+  it.each(['X-Frame-Options', 'X-Custom_Thing', "X-Weird'Name", 'X-Netcel.Trace', 'Server'])(
+    'accepts the header name %j',
+    (headerName) => {
+      expect(isValidHeaderName(headerName)).toBe(true);
+    }
+  );
+
+  it.each(['', 'X Frame Options', 'X-Frame:Options', 'X-Frame\r\nOptions', 'Header;name'])(
+    'rejects the header name %j',
+    (headerName) => {
+      expect(isValidHeaderName(headerName)).toBe(false);
+    }
+  );
+
+  // Response splitting: a CR or LF reaching the head would let an attacker
+  // append arbitrary headers.
+  it.each(['a\r\nX-Evil: 1', 'a\nb', 'a\tb', 'a\u007f'])(
+    'finds control characters in %j',
+    (value) => {
+      expect(hasControlCharacters(value)).toBe(true);
+    }
+  );
+
+  it.each(['max-age=63072000; includeSubDomains', 'same-origin', 'a b c', ''])(
+    'finds none in %j',
+    (value) => {
+      expect(hasControlCharacters(value)).toBe(false);
+    }
+  );
 });
 
 describe('compiling response headers', () => {
