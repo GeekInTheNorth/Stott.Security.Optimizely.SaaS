@@ -1,0 +1,67 @@
+meta:
+  app_id: stott_security
+  display_name: Stott Security
+  # Base version deliberately 0.0.1, matching Optimizely's own reference app
+  # (unsplash_viewer 0.0.1-dev.24) and every other working app in this account.
+  # A 1.0.0-dev.N base did not surface in the App Directory; the version table
+  # treats plain 1.0.0 as "publicly listed, review required", so a 1.0.0 base
+  # appears to be gated differently even in pre-release.
+  version: 0.0.1-dev.22
+  # Auto-populated from the OCP account by `ocp app init`.
+  vendor: netcel
+  summary: Manage Content Security Policy and response headers for Optimizely CMS (SaaS).
+  support_url: https://github.com/GeekInTheNorth/Stott.Security.Optimizely
+  contact_email: mark.stott@netcel.com
+  categories:
+    - Content Management
+  # `all` matches the reference app. Cannot be combined with specific zones.
+  availability:
+    - all
+
+# node22-cms-ext (not plain node22) is required for CMS UI extensions.
+runtime: node22-cms-ext
+
+# ---------------------------------------------------------------------------
+# UI extensions
+#
+# `view` is the full-page surface, declared by the build-time SDK as:
+#
+#   export declare const UI_EXTENSION_INJECTION_POINTS: readonly ["sidebar", "view"];
+#
+# WARNING: @optimizely/ocp-cms-ui-extensions-sdk must not be installed from the
+# npm `latest` dist-tag, which resolves to a build declaring ["sidebar"] only and
+# rejects `view` at validation. package.json pins an exact version for this
+# reason — check UI_EXTENSION_INJECTION_POINTS in the installed package before
+# changing it.
+#
+# Validator rules (from dist/validator.js):
+#   - `name` must be unique across ALL injection points
+#   - `entry_point` must be unique across ALL injection points
+#   - `display_name` must not be blank
+#   - a built bundle must exist at <baseDir>/cms-ui-extensions/<entry_point>.js
+# ---------------------------------------------------------------------------
+ui_extensions:
+  view:
+    - name: stott-security-console
+      entry_point: SecurityConsole
+      display_name: Stott Security
+
+functions:
+  # Backend for the console. Reachable only via
+  # context.extension.invokeFunction() — no public URL.
+  cms_extension:
+    entry_point: CmsExtension
+    description: Backend for the Stott Security console (draft CRUD and publish).
+    accepts: cms_ui_extension
+
+  # Public, GUUID-resolved function consumed by the Next.js head.
+  #
+  # Deliberately NOT `global: true`. A GlobalFunction has no installation
+  # context — no installId, no trackerId — and can therefore only reach
+  # storage.sharedKvStore. As a regular App.Function this resolves an
+  # installation from the UUID in its public URL and so can read the same
+  # per-installation storage.kvStore that cms_extension writes to. That shared
+  # partition is what the whole precompute-on-publish design rests on.
+  compiled_headers:
+    entry_point: CompiledHeaders
+    description: Serves compiled security headers to the site head.

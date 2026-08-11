@@ -1,0 +1,83 @@
+sections:
+  # --------------------------------------------------------------------------
+  # The heads this installation serves.
+  #
+  # PaaS reads its app/host list from CMS 13's IApplicationRepository. No
+  # equivalent registry is exposed to an OCP app, so the scopes an editor can
+  # target have to be declared here instead. This replaces the /api/applications
+  # endpoint that backs the console's context switcher.
+  # --------------------------------------------------------------------------
+  - key: heads
+    label: Site heads
+    elements:
+      - type: instructions
+        text: >
+          Declare the front end that consumes security headers from this app.
+          The console uses this to scope configuration. Leave both fields empty
+          to manage a single global policy.
+
+      - type: text
+        key: app_id
+        label: Application identifier
+        help: >
+          A short stable name for this front end, for example `web` or
+          `campaign-site`. Used only to scope configuration — it never appears in
+          a response header.
+
+      - type: text
+        key: host_names
+        label: Host names
+        help: >
+          Comma-separated hosts this front end serves, for example
+          `www.example.com, example.com`. Used to scope host-specific overrides.
+
+  # --------------------------------------------------------------------------
+  # Violation reporting.
+  #
+  # This app does NOT ingest CSP violation reports — it only tells browsers where
+  # to send them. Reports go directly from the browser to the collector; they
+  # never pass through this app.
+  #
+  # The URL is a `secret` rather than `text` because collector URLs commonly
+  # embed an API key (report-uri.com's do), which makes it a credential.
+  # --------------------------------------------------------------------------
+  - key: reporting
+    label: Violation reporting
+    elements:
+      - type: instructions
+        text: >
+          Content Security Policy violations can be sent to an external collector
+          such as report-uri.com. Reports are posted **directly by the visitor's
+          browser** to the collector — they do not pass through this app, and this
+          app does not store them.
+
+      - type: toggle
+        key: enabled
+        label: Send violation reports to an external collector
+        help: >
+          When enabled, compiled policies carry a `report-to` directive and a
+          `Reporting-Endpoints` header naming the collector below.
+
+      - type: secret
+        key: collector_url
+        label: Collector URL
+        help: >
+          Must be an absolute `https://` URL. Browsers will not post reports to
+          plain HTTP from an HTTPS page. Stored as a secret because collector URLs
+          frequently embed an API key.
+        required:
+          key: reporting.enabled
+          equals: true
+        visible:
+          key: reporting.enabled
+          equals: true
+
+      - type: instructions
+        visible:
+          key: reporting.enabled
+          equals: true
+        text: >
+          **Data protection note.** Violation reports include the blocked URI, the
+          document URI and the referrer, so they can carry personal data. Confirm
+          you have a lawful basis for sending them to a third party, and a data
+          processing agreement with the collector, before enabling this.

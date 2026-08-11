@@ -1,0 +1,45 @@
+{
+  "name": "stott_security_app",
+  "version": "1.0.0-dev.1",
+  "main": "dist/index.js",
+  "license": "UNLICENSED",
+  "private": true,
+  "description": "OCP app providing CSP and response header management for Optimizely CMS (SaaS).",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "//packageManager": "The OCP builder reads this to decide which manager runs build/lint/test. The scaffolded template ships `yarn clean` in its build script even when scaffolded with --package-manager npm, which fails in the build image. Scripts below use npm run, or call binaries directly (manager-agnostic).",
+  "packageManager": "npm@10.9.4",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "build": "npm run clean && vite build --config vite.backend.config.mjs && vite build --config vite.ui.config.mjs",
+    "lint": "eslint src --ext ts,tsx",
+    "test": "vitest run --passWithNoTests",
+    "validate": "npm run lint && npm run typecheck && npm run build && cross-env LOG_LEVEL=NEVER ocp-app-sdk validate"
+  },
+  "//dependencies": "@optimizely/ocp-cms-ui-extensions-sdk is PINNED to 1.0.0-beta.4. The template ships `latest`, which resolves to 1.0.0-beta.1 — that version declares UI_EXTENSION_INJECTION_POINTS as ['sidebar'] only and REJECTS the 'view' (full page) surface this app depends on. Do not relax to latest or ^ without re-checking dist/AppManifest.d.ts.",
+  "dependencies": {
+    "@optiaxiom/react": "^3.0.0",
+    "@optimizely/cms-extensibility-sdk": "1.0.1",
+    "@optimizely/ocp-cms-ui-extensions-sdk": "1.0.0-beta.4",
+    "@tanstack/react-table": "^8.13.0",
+    "@zaiusinc/app-sdk": "3.4.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "@zaiusinc/eslint-config-presets": "^3.1.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.5.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3",
+    "vite": "^8.0.0",
+    "vite-plugin-css-injected-by-js": "^5.0.1",
+    "vitest": "^4.0.8"
+  }
+}

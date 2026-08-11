@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output. `npm run build` regenerates all of it, and the OCP builder
+# rebuilds from source in its own image, so nothing here is a source of truth.
+dist/
+
+# Local environment. `vitest.config.ts` reads `.env.test`; anything matching
+# these names is machine-local and may hold credentials.
+.env
+.env.*
+!.env.example
+
+# OCP CLI local state. API keys live in ~/.ocp/credentials.json outside the
+# repository, but the CLI writes logs and scratch files alongside the app.
+.ocp/
+*.log
+npm-debug.log*
+
+# Test and tool caches
+coverage/
+.vitest/
+.eslintcache
+*.tsbuildinfo
+
+# Packed tarballs from `npm pack`
+*.tgz
+
+# Editors and IDEs
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
