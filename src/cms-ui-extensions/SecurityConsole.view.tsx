@@ -46,10 +46,11 @@ const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
 function SecurityConsole({ context }: { context: ExtensionContext }): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('headers');
 
-  // The empty scope is the global one, which every installation has. Per-app and
-  // per-host scopes are addressed by the same storage keys but are entered
-  // through forms/settings.yml, because OCP exposes no application registry an
-  // extension could enumerate.
+  // This build has one scope, the global one. Per-app and per-host configuration
+  // is a PaaS feature backed by a relational database; here there is key-value
+  // storage and no application registry an extension could enumerate to populate
+  // a switcher. The storage keys and fallback chain carry the scope shape so it
+  // can be added without migrating documents, but nothing writes a narrower one.
   const scope = useMemo<Scope>(() => ({}), []);
 
   // Publish attribution. The extension context carries no user identity, so

@@ -17,10 +17,14 @@ import type { ConfigDocument, HeaderDto } from './config.js';
 export const CMS_EXTENSION_FUNCTION_ID = 'cms_extension';
 
 /**
- * Which app/host a request concerns. Mirrors the PaaS `appId`/`hostName`
- * scoping, which is already the product's multi-tenancy axis.
+ * Which app/host a request concerns, mirroring the PaaS `appId`/`hostName`
+ * scoping axis.
  *
- * Both omitted means the global scope.
+ * Both omitted means the global scope — the only one this build populates.
+ * Per-app and per-host configuration belongs to the PaaS product, where a
+ * relational database backs it; reproducing it on OCP key-value storage is
+ * separate work. It is carried through the contract so it does not have to be
+ * threaded in retrospectively.
  */
 export interface Scope {
   readonly appId?: string;

@@ -71,7 +71,12 @@ export interface CspSettingsConfig {
   readonly isReportOnly: boolean;
   readonly isUpgradeInsecureRequestsEnabled: boolean;
   readonly useExternalReporting: boolean;
-  /** Absolute collector URL. Held in the settings store, not KV — may embed a key. */
+  /**
+   * Absolute collector URL, entered in the console and stored in KV with the rest
+   * of the draft. report-uri.com and its like embed an API key in the path, so
+   * this field can hold a credential in plain text — which is why it is included
+   * in an export, and why an export should be handled as a secret.
+   */
   readonly externalReportToUrl: string;
 }
 

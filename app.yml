@@ -1,14 +1,8 @@
 meta:
   app_id: stott_security
   display_name: Stott Security
-  # Base version deliberately 0.0.1, matching Optimizely's own reference app
-  # (unsplash_viewer 0.0.1-dev.24) and every other working app in this account.
-  # A 1.0.0-dev.N base did not surface in the App Directory; the version table
-  # treats plain 1.0.0 as "publicly listed, review required", so a 1.0.0 base
-  # appears to be gated differently even in pre-release.
-  version: 0.0.1-dev.22
-  # Auto-populated from the OCP account by `ocp app init`.
-  vendor: Mark Stott
+  version: 0.0.1-dev.24
+  vendor: netcel
   summary: Manage Content Security Policy and response headers for Optimizely CMS (SaaS).
   support_url: https://github.com/GeekInTheNorth/Stott.Security.Optimizely.SaaS
   contact_email: support@stott.pro

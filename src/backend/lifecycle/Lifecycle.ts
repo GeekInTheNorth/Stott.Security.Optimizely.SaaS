@@ -59,8 +59,8 @@ export class Lifecycle extends AppLifecycle {
     _section: string,
     _formData: SubmittedFormData
   ): Promise<LifecycleSettingsResult> {
-    // No OAuth: this app holds no third-party credentials. The report collector
-    // URL is the only secret and it is entered directly.
+    // No OAuth: this app holds no third-party credentials and integrates with
+    // nothing that could grant one.
     return new LifecycleSettingsResult().addToast('danger', 'OAuth is not used by this app.');
   }
 

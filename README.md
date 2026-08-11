@@ -68,8 +68,12 @@ Configuration lives in OCP key-value storage, per installation:
 | `config:v1:{appId}:{hostName}` | The draft — the system of record for editing. |
 | `compiled:v1:{appId}:{hostName}` | The published output the public endpoint serves. |
 
-Both are scoped, with a fallback chain of host → app → global, mirroring the PaaS
-scoping model. An empty scope is the global one and is what the console edits.
+**This build has a single global scope.** Per-app and per-host configuration is a
+PaaS feature, where a relational database backs an inheritance chain of
+host → app → global. OCP provides key-value storage, so the keys above carry the
+scope shape and `readCompiled` walks the chain, but the console edits the global
+scope and nothing writes a narrower one. A head may pass `appId` and `hostName`
+to the endpoint today; both resolve to the global document.
 
 > **There is no backup but the export.** Uninstalling the app deletes its storage
 > and there is no restore path. The console's **Tools** tab exists for this

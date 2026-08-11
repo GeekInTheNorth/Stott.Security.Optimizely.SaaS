@@ -87,7 +87,10 @@ export function measureConfig(config: ConfigDocument): number {
  * The scopes to try, most specific first — host, then app, then global.
  *
  * Mirrors the PaaS inheritance chain, where a host-level record overrides an
- * app-level one which overrides the global default.
+ * app-level one which overrides the global default. Nothing in this build writes
+ * a scope narrower than global, so every chain terminates there today. The walk
+ * is kept so per-host configuration can be added without migrating stored
+ * documents or changing how a head calls the endpoint.
  */
 export function fallbackChain(scope: Scope): Scope[] {
   const chain: Scope[] = [];
