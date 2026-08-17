@@ -15,11 +15,11 @@ It manages two things:
 Editors work on a **draft**. Publishing compiles that draft and writes the result
 to a public endpoint; nothing a customer's site serves changes until they do.
 
-This is the SaaS counterpart to
-[Stott.Security.Optimizely](https://github.com/GeekInTheNorth/Stott.Security.Optimizely),
-the PaaS addon for CMS 12+. The CSP engine here is a faithful TypeScript port of
-that project's, and the two are kept aligned deliberately — see
-[CLAUDE.md](CLAUDE.md).
+<a href="https://www.buymeacoffee.com/markstott" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
+[![Stott Security Articles](https://www.stott.pro/assets/stott-security-cta.png)](https://www.stott.pro/article/list/stott-security)
+
+This is the SaaS counterpart to [Stott.Security.Optimizely](https://github.com/GeekInTheNorth/Stott.Security.Optimizely), the PaaS addon for CMS 12+. The CSP engine here is a faithful TypeScript port of that project's, and the two are kept aligned deliberately — see [CLAUDE.md](CLAUDE.md).
 
 ---
 
