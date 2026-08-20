@@ -8,6 +8,8 @@
  * build a header that the save then rejects.
  */
 
+import { HeaderNames } from './constants.js';
+
 /**
  * Header names must be a valid HTTP field-name (RFC 9110 token). Rejecting
  * anything else matters: a name containing CR, LF or a colon could otherwise be
@@ -35,3 +37,26 @@ export function isValidHeaderName(headerName: string): boolean {
 export function hasControlCharacters(value: string): boolean {
   return CONTROL_CHARACTERS.test(value);
 }
+
+/**
+ * Header names the engine compiles from elsewhere in the document, and which a
+ * custom header must therefore not claim. Mirrors
+ * `SaveCustomHeaderModel.IsBuiltInSecurityHeader` in PaaS.
+ *
+ * The eight standard security headers are deliberately **not** here: configuring
+ * one of those is exactly how they get set, and `listHeaderRows` reconciles a
+ * customer's row with its definition. These are the ones produced by a different
+ * tab, where a second header of the same name would compete and which of the two
+ * took effect would be invisible in the console.
+ *
+ * Lives here rather than beside the compilers because both halves need the same
+ * answer — the console has to refuse a name that the save would refuse.
+ */
+export const RESERVED_HEADER_NAMES: ReadonlySet<string> = new Set(
+  [
+    HeaderNames.ContentSecurityPolicy,
+    HeaderNames.ReportOnlyContentSecurityPolicy,
+    HeaderNames.ReportingEndpoints,
+    HeaderNames.PermissionsPolicy
+  ].map((name) => name.toLowerCase())
+);

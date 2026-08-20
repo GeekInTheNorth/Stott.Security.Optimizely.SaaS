@@ -76,6 +76,19 @@ export interface DraftResult {
  */
 export type ConfigDocumentPayload = unknown;
 
+/**
+ * The result of an import, plus anything the import had to discard.
+ *
+ * `droppedDirectives` exists for the PaaS migration: three Permissions Policy
+ * directive names PaaS emits are not offered here, so they are dropped rather
+ * than failing the whole document. Dropping them silently would mean a customer
+ * moving between the two products loses configuration without being told, which
+ * is why the list comes back rather than staying in a server log.
+ */
+export interface ImportResult extends DraftResult {
+  readonly droppedDirectives: readonly string[];
+}
+
 export interface PublishResult {
   readonly headers: readonly HeaderDto[];
   readonly publishedAt: string;
@@ -121,7 +134,9 @@ export interface Diagnostic {
     | 'policy-split'
     | 'approaching-size-limit'
     | 'no-directives-granted'
-    | 'no-headers';
+    | 'no-headers'
+    | 'permission-policy-empty'
+    | 'permission-policy-large';
   readonly message: string;
 }
 

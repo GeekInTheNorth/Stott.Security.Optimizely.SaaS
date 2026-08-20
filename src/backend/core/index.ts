@@ -12,9 +12,15 @@ import type { Diagnostic } from '../../shared/contracts.js';
 import { HeaderNames, SPLIT_THRESHOLD, TERMINAL_THRESHOLD } from '../../shared/constants.js';
 import { analyseCsp, compileCspHeaders } from './csp.js';
 import { compileCustomHeaders } from './headers.js';
+import { analysePermissionPolicy, compilePermissionPolicyHeaders } from './permission-policy.js';
 
 export { analyseCsp, compileCspHeaders, type CspOutcome } from './csp.js';
 export { compileCustomHeaders, listHeaderRows } from './headers.js';
+export {
+  analysePermissionPolicy,
+  compilePermissionPolicyHeaders,
+  type PermissionPolicyOutcome
+} from './permission-policy.js';
 export { groupDirectives } from './optimizer.js';
 export { createDirective, directiveToString, type CspDirective } from './directive.js';
 
@@ -31,9 +37,11 @@ export { createDirective, directiveToString, type CspDirective } from './directi
  * the request it is actually answering.
  */
 export function compileHeaders(config: ConfigDocument): HeaderDto[] {
-  return [...compileCspHeaders(config), ...compileCustomHeaders(config)].sort((a, b) =>
-    a.key < b.key ? -1 : a.key > b.key ? 1 : 0
-  );
+  return [
+    ...compileCspHeaders(config),
+    ...compilePermissionPolicyHeaders(config),
+    ...compileCustomHeaders(config)
+  ].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 
 /**
@@ -109,15 +117,48 @@ export function compileWithDiagnostics(config: ConfigDocument): {
     });
   }
 
+  const permissionPolicy = analysePermissionPolicy(config);
+
+  if (permissionPolicy.kind === 'nothing-configured') {
+    diagnostics.push({
+      severity: 'info',
+      code: 'permission-policy-empty',
+      message:
+        'The Permissions Policy is enabled but no header will be emitted: every directive is ' +
+        'still set to Disabled, which leaves the browser default in place. Set a directive to ' +
+        'something else, or turn the policy off.'
+    });
+  }
+
+  // Unlike the CSP this header cannot be split, so an oversized value is dropped
+  // whole by a CDN with nothing to say about it. Same 90%-of-split-threshold bar,
+  // because the limit being approached is the CDN's, not the optimiser's.
+  if (permissionPolicy.kind === 'emitted' && permissionPolicy.bytes > SPLIT_THRESHOLD * 0.9) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'permission-policy-large',
+      message:
+        `The Permissions Policy header is ${permissionPolicy.bytes} bytes, close to the ` +
+        `${SPLIT_THRESHOLD} byte limit CDNs commonly impose. This header cannot be split, so ` +
+        'past that limit it is dropped in full. Reduce the number of directives carrying ' +
+        'origin lists, or consolidate origins using wildcards.'
+    });
+  }
+
   // Only worth saying when the whole configuration is empty — not when CSP is
-  // deliberately off but response headers are doing the work.
-  if (headers.length === 0 && config.headers.length === 0) {
+  // deliberately off but response headers or a Permissions Policy are doing the
+  // work.
+  if (
+    headers.length === 0 &&
+    config.headers.length === 0 &&
+    permissionPolicy.kind === 'disabled'
+  ) {
     diagnostics.push({
       severity: 'info',
       code: 'no-headers',
       message:
         'Nothing is configured yet, so no headers will be applied. Enable the Content ' +
-        'Security Policy or set a response header to Add or Remove.'
+        'Security Policy or the Permissions Policy, or set a response header to Add or Remove.'
     });
   }
 

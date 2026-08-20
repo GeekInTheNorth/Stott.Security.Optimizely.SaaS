@@ -63,7 +63,8 @@ export const Sources = {
 export const HeaderNames = {
   ContentSecurityPolicy: 'Content-Security-Policy',
   ReportOnlyContentSecurityPolicy: 'Content-Security-Policy-Report-Only',
-  ReportingEndpoints: 'Reporting-Endpoints'
+  ReportingEndpoints: 'Reporting-Endpoints',
+  PermissionsPolicy: 'Permissions-Policy'
 } as const;
 
 /**

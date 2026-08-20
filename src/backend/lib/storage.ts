@@ -26,7 +26,12 @@
 
 import { storage, type KVHash } from '@zaiusinc/app-sdk';
 
-import { createEmptyConfig, type ConfigDocument, type HeaderDto } from '../../shared/config.js';
+import {
+  createEmptyConfig,
+  normaliseConfig,
+  type ConfigDocument,
+  type HeaderDto
+} from '../../shared/config.js';
 import type { Scope } from '../../shared/contracts.js';
 import { CorruptDocumentError, DocumentTooLargeError, StaleRevisionError } from './errors.js';
 
@@ -108,6 +113,11 @@ export function fallbackChain(scope: Scope): Scope[] {
   return chain;
 }
 
+/**
+ * Normalised on the way out, because a document written before a section existed
+ * would otherwise hand the engine `undefined` where the type promises an object.
+ * Every installation predating a new section is in exactly that state.
+ */
 function parseConfig(key: string, json: string): ConfigDocument {
   try {
     const parsed = JSON.parse(json) as unknown;
@@ -115,7 +125,7 @@ function parseConfig(key: string, json: string): ConfigDocument {
       throw new Error('not an object');
     }
 
-    return parsed as ConfigDocument;
+    return normaliseConfig(parsed as ConfigDocument);
   } catch (cause) {
     throw new CorruptDocumentError(key, cause);
   }

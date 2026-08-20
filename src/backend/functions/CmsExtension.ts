@@ -17,6 +17,7 @@ import {
   type Action,
   type DraftResult,
   type Envelope,
+  type ImportResult,
   type IntegrationResult,
   type PublishResult,
   type Scope,
@@ -37,7 +38,8 @@ import {
   writeDraft
 } from '../lib/storage.js';
 import { validateConfig } from '../lib/validation.js';
-import type { ConfigDocument } from '../../shared/config.js';
+import { normaliseConfig, type ConfigDocument } from '../../shared/config.js';
+import { remapLegacyPermissionPolicy } from '../../shared/permission-policy.js';
 
 interface RequestBody {
   action?: unknown;
@@ -165,20 +167,51 @@ export class CmsExtension extends App.Function {
     };
   }
 
-  private async importConfig(scope: Scope, params: ScopedParams): Promise<DraftResult> {
+  /**
+   * Replaces the draft from a previously exported document.
+   *
+   * Two things happen before validation, and both are what make a PaaS export
+   * importable: `normaliseConfig` fills in sections the document predates, and
+   * `remapLegacyPermissionPolicy` brings directive names up to date. Without the
+   * latter a PaaS document fails validation on three unrecognised directives, and
+   * import is the only migration path between the two products.
+   */
+  private async importConfig(scope: Scope, params: ScopedParams): Promise<ImportResult> {
     if (!params.config) {
       throw new InvalidPayloadError('A `config` document is required.');
     }
 
-    const errors = validateConfig(params.config);
+    const normalised = normaliseConfig(params.config);
+
+    // Only remap what is shaped like a directive list. A malformed section is
+    // passed through for `validateConfig` to reject with a message naming it,
+    // rather than throwing here on an unhelpful TypeError.
+    const existing = normalised.permissionPolicy?.directives;
+    const { directives, dropped } = Array.isArray(existing)
+      ? remapLegacyPermissionPolicy(existing)
+      : { directives: existing, dropped: [] as string[] };
+
+    const config: ConfigDocument = {
+      ...normalised,
+      permissionPolicy: { ...normalised.permissionPolicy, directives }
+    };
+
+    const errors = validateConfig(config);
     if (errors.length > 0) {
       throw new InvalidPayloadError(`The imported configuration is not valid. ${errors.join(' ')}`);
     }
 
-    // No expectedRevision: an import deliberately overwrites whatever is there.
-    const revision = await writeDraft(scope, params.config);
+    if (dropped.length > 0) {
+      logger.info(
+        `Import for scope ${describeScope(scope)} dropped unsupported Permissions Policy ` +
+          `directives: ${dropped.join(', ')}.`
+      );
+    }
 
-    return { config: params.config, revision };
+    // No expectedRevision: an import deliberately overwrites whatever is there.
+    const revision = await writeDraft(scope, config);
+
+    return { config, revision, droppedDirectives: dropped };
   }
 
   /**

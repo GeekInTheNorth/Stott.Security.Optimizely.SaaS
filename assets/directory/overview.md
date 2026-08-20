@@ -11,6 +11,9 @@ Optimizely CMS (SaaS), without redeploying your front end.
 - **Response headers** — the eight standard security headers with validated values,
   a dedicated HSTS editor, and any custom header you need. Headers can be added or
   actively removed.
+- **Permissions Policy** — control which browser features your site and the third
+  parties it embeds may use, across 48 directives, each allowed for everyone, this
+  site only, a named list of origins, or nobody at all.
 - **Automatic header splitting** — large policies are split across multiple
   `Content-Security-Policy` headers to stay under CDN size limits, without losing
   granularity.
@@ -40,5 +43,4 @@ the published policy carries a placeholder that your middleware substitutes.
 This is the SaaS companion to
 [Stott Security for Optimizely CMS 12/13](https://github.com/GeekInTheNorth/Stott.Security.Optimizely),
 the NuGet addon for PaaS. The two are separate products: the PaaS addon additionally
-covers CORS, Permissions-Policy, security.txt, violation report storage and a full
-audit trail.
+covers CORS, security.txt, violation report storage and a full audit trail.

@@ -55,6 +55,7 @@ import {
 } from '../../shared/config.js';
 import {
   HEADER_NAME_RULE,
+  RESERVED_HEADER_NAMES,
   hasControlCharacters,
   isValidHeaderName
 } from '../../shared/header-rules.js';
@@ -564,6 +565,12 @@ function describeNameProblem(headerName: string, duplicate: boolean): string | u
 
   if (duplicate) {
     return 'Another header is already configured with this name.';
+  }
+
+  // Headers the engine compiles from another tab. A second header of the same
+  // name would compete with it, and nothing here would show that.
+  if (RESERVED_HEADER_NAMES.has(trimmed.toLowerCase())) {
+    return 'This header is managed by this app. Configure it on its own tab instead.';
   }
 
   return undefined;

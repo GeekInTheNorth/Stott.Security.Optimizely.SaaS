@@ -111,7 +111,10 @@ function Export({
   return (
     <Section
       title="Export"
-      description="A complete copy of the stored configuration — settings, sources, sandbox and response headers."
+      description={
+        'A complete copy of the stored configuration — settings, sources, sandbox, response ' +
+        'headers and permissions policy.'
+      }
     >
       <Notice intent="warning">
         Keep a copy somewhere outside Optimizely. This configuration is held by the app
@@ -205,8 +208,8 @@ function Import({
       description="Restore a previously exported configuration, or copy one in from another environment."
     >
       <Notice intent="warning">
-        Importing replaces the entire draft — every setting, source and response header. It does
-        not change what the site serves until you publish.
+        Importing replaces the entire draft — every setting, source, response header and
+        permissions policy directive. It does not change what the site serves until you publish.
       </Notice>
 
       <Group gap="8" flexWrap="wrap">

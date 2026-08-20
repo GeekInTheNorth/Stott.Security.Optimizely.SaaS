@@ -29,6 +29,12 @@ console (browser)                    backend (OCP functions)
             shared/  ← types and constants used by both
 ```
 
+`shared/permission-policy.ts` is the pattern to follow for a self-contained
+feature: its directive table, its origin rules **and its serialiser** all live
+there, so the console's live preview renders through the same `toPolicyFragment`
+the engine emits with. PaaS keeps a second copy of that logic in its React layer;
+one function used by both is what stops a preview disagreeing with reality.
+
 The console never constructs a URL. It calls
 `context.extension.invokeFunction(CMS_EXTENSION_FUNCTION_ID, { action, params })`
 and the backend switches on `action`. Adding an operation means adding to
@@ -118,6 +124,41 @@ compiled header. The directive list shown in the console
 (`console/directives.ts`) is a separate *display* order that matches the PaaS UI
 — the two are deliberately different and both have 19 entries.
 
+**`PERMISSION_POLICY_DIRECTIVES` order is emission order too**, and unlike the CSP
+list it is also the display order — there is only one. It is alphabetical, which is
+a deliberate divergence: PaaS applies no `ORDER BY` when reading its rows, so two
+PaaS installations holding identical configuration can emit different headers.
+
+**The Permissions Policy directive list follows MDN, and excludes two directives
+MDN lists.** `attribution-reporting` and `browsing-topics` are deprecated,
+non-standard and pending removal — Chrome withdrew those Privacy Sandbox features.
+48 entries, not the 50 on MDN's directive index. That index shows *no* status
+flags; they live only on each directive's own page, so regenerating the table from
+the index silently restores both. A test asserts their absence for that reason.
+
+**`Disabled` and `None` are different states.** `Disabled` omits the directive so
+the browser default applies; `None` emits `()` and blocks the feature outright.
+Collapsing them would silently change what a site permits.
+
+**A header the engine compiles cannot also be a custom header.**
+`RESERVED_HEADER_NAMES` in `shared/header-rules.ts` is what enforces that. The
+eight standard headers are deliberately *not* in it — configuring one of those is
+exactly how it gets set. The reserved ones are those produced by another tab, where
+a duplicate would compete and the console would show no sign of it.
+
+**Import remaps before it validates.** `remapLegacyPermissionPolicy` renames the
+two directives PaaS misspelled and drops the three it offers that this app does
+not. Without it a PaaS export fails validation outright, and import is the only
+migration path between the two products. The dropped names come back in
+`ImportResult.droppedDirectives` and are shown to the editor — a silent drop loses
+a customer's configuration invisibly.
+
+**A new config section must be optional in `validateConfig` and filled in by
+`normaliseConfig`.** `readDraft` casts stored JSON straight to `ConfigDocument`, so
+every installation predating the section holds a document without it; and
+`validation.test.ts` asserts that any export is importable, which a mandatory
+missing-section check would break for every older backup.
+
 **Engine parity with the PaaS project.** `core/optimizer.ts`, `core/csp.ts` and
 `core/headers.ts` are faithful ports of `CspOptimizer.cs`, `CspService.cs` and
 `CustomHeaderService.cs`. Where behaviour diverges it is commented as such.
@@ -185,6 +226,14 @@ metadata, and the backend materialises unconfigured standard headers as
 directive group, update `groupDirectives()` in `core/optimizer.ts`. Add a
 friendly description to `console/directives.ts`, and cover it in
 `tests/csp.test.ts`.
+
+**A new Permissions Policy directive.** One entry in
+`PERMISSION_POLICY_DIRECTIVES` in `shared/permission-policy.ts`, in alphabetical
+position, with a title and a description in the same voice as its neighbours
+("Controls whether the site is allowed to…"). Nothing else — the console builds its
+cards from that table and the engine compiles from it. Check the directive's own
+MDN page first: a *Deprecated* banner means it does not belong in the list at all.
+Update the count in `tests/permission-policy.test.ts`.
 
 **A new console tab.** Add to `TABS` and a `TabsContent` in
 `SecurityConsole.view.tsx`, and a component under `console/`. Panels carry

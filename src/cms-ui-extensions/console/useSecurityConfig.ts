@@ -216,9 +216,20 @@ export function useSecurityConfig(
       setError(undefined);
 
       try {
-        await client.importConfig(scope, payload);
+        const result = await client.importConfig(scope, payload);
         await load();
-        setNotice('Configuration imported into the draft. Publish to make it live.');
+
+        // A PaaS export can carry Permissions Policy directives this app does not
+        // offer. They are dropped rather than failing the import, so the drop has
+        // to be said out loud — otherwise configuration disappears between the
+        // two products with nothing to show it happened.
+        setNotice(
+          result.droppedDirectives.length > 0
+            ? 'Configuration imported into the draft. These Permissions Policy directives are ' +
+                `not supported and were dropped: ${result.droppedDirectives.join(', ')}. ` +
+                'Publish to make it live.'
+            : 'Configuration imported into the draft. Publish to make it live.'
+        );
       } catch (cause) {
         setError(describe(cause));
       } finally {

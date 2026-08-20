@@ -10,7 +10,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CustomHeaderBehavior,
+  PermissionPolicyState,
   createEmptyConfig,
+  normaliseConfig,
   type ConfigDocument
 } from '../shared/config.js';
 import { Directives } from '../shared/constants.js';
@@ -131,6 +133,37 @@ describe('validateConfig', () => {
       ).toContain('control characters');
     });
 
+    /**
+     * Headers the engine compiles from another part of the document. A second
+     * header of the same name would compete with it, and which of the two took
+     * effect would be invisible in the console.
+     */
+    it.each([
+      'Permissions-Policy',
+      'permissions-policy',
+      'Content-Security-Policy',
+      'Content-Security-Policy-Report-Only',
+      'Reporting-Endpoints'
+    ])('rejects %j, which this app manages itself', (headerName) => {
+      expect(
+        validateConfig(
+          withHeaders([{ id: 'h', headerName, behavior: 'Add', headerValue: 'camera=()' }])
+        ).join(' ')
+      ).toContain('managed by this app');
+    });
+
+    // The eight standard headers are configured exactly by adding a row, so they
+    // must not be caught by the reserved-name rule.
+    it('still accepts a standard security header', () => {
+      expect(
+        validateConfig(
+          withHeaders([
+            { id: 'h', headerName: 'Strict-Transport-Security', behavior: 'Add', headerValue: 'max-age=1' }
+          ])
+        )
+      ).toEqual([]);
+    });
+
     // Silently letting the last one win would make the effective config invisible.
     it('rejects a duplicated header name, case-insensitively', () => {
       expect(
@@ -165,6 +198,135 @@ describe('validateConfig', () => {
           ])
         )
       ).toEqual([]);
+    });
+  });
+
+  /**
+   * Unlike the sections above, this one is validated only when present.
+   * Export/import is the only backup a customer can hold, so a document exported
+   * before the section existed has to stay restorable — a missing-section check
+   * here would make every older export unimportable.
+   */
+  describe('permissions policy', () => {
+    const withDirectives = (
+      directives: Array<Record<string, unknown>>
+    ): Record<string, unknown> => ({
+      ...valid(),
+      permissionPolicy: { isEnabled: true, directives }
+    });
+
+    it('accepts a document that carries no permissionPolicy at all', () => {
+      const doc = { ...valid() } as Record<string, unknown>;
+      delete doc['permissionPolicy'];
+
+      expect(validateConfig(doc)).toEqual([]);
+    });
+
+    it('normalises a document that carries no permissionPolicy into an empty one', () => {
+      const doc = { ...valid() } as Record<string, unknown>;
+      delete doc['permissionPolicy'];
+
+      expect(normaliseConfig(doc as unknown as ConfigDocument).permissionPolicy).toEqual({
+        isEnabled: false,
+        directives: []
+      });
+    });
+
+    it('rejects a permissionPolicy that is not an object', () => {
+      expect(
+        validateConfig({ ...valid(), permissionPolicy: 'on' }).join(' ')
+      ).toContain('permissionPolicy');
+    });
+
+    it('rejects a missing directives array', () => {
+      expect(
+        validateConfig({ ...valid(), permissionPolicy: { isEnabled: true } }).join(' ')
+      ).toContain('directives');
+    });
+
+    it('rejects an unrecognised directive', () => {
+      expect(
+        validateConfig(withDirectives([{ directive: 'teleport', state: 'None', origins: [] }])).join(
+          ' '
+        )
+      ).toContain('teleport');
+    });
+
+    it.each(['attribution-reporting', 'browsing-topics', 'document-domain', 'opt-credentials'])(
+      'rejects the unsupported directive %s, which import is expected to have remapped',
+      (name) => {
+        expect(
+          validateConfig(withDirectives([{ directive: name, state: 'None', origins: [] }])).join(' ')
+        ).toContain(name);
+      }
+    );
+
+    it('rejects a duplicated directive', () => {
+      const errors = validateConfig(
+        withDirectives([
+          { directive: 'camera', state: 'None', origins: [] },
+          { directive: 'CAMERA', state: 'All', origins: [] }
+        ])
+      );
+
+      expect(errors.join(' ')).toContain('more than once');
+    });
+
+    it('rejects an unknown state', () => {
+      expect(
+        validateConfig(withDirectives([{ directive: 'camera', state: 'Maybe', origins: [] }])).join(
+          ' '
+        )
+      ).toContain('Maybe');
+    });
+
+    // An empty list is what makes SpecificSites collapse to `()`, blocking the
+    // feature rather than allowing the origins the editor meant to name.
+    it.each(['SpecificSites', 'ThisAndSpecificSites'])(
+      'rejects %s with no origins',
+      (state) => {
+        expect(
+          validateConfig(withDirectives([{ directive: 'camera', state, origins: [] }])).join(' ')
+        ).toContain('no origins');
+      }
+    );
+
+    it('accepts a state that needs no origins without any', () => {
+      expect(
+        validateConfig(withDirectives([{ directive: 'camera', state: 'ThisSite', origins: [] }]))
+      ).toEqual([]);
+    });
+
+    it('rejects an invalid origin', () => {
+      expect(
+        validateConfig(
+          withDirectives([
+            { directive: 'camera', state: 'SpecificSites', origins: ['not-a-url'] }
+          ])
+        ).join(' ')
+      ).toContain('not-a-url');
+    });
+
+    // Response splitting: a CR or LF reaching the head would let an attacker
+    // append arbitrary headers.
+    it('rejects an origin containing control characters', () => {
+      expect(
+        validateConfig(
+          withDirectives([
+            {
+              directive: 'camera',
+              state: 'SpecificSites',
+              origins: ['https://a.example.com\r\nX-Evil: 1']
+            }
+          ])
+        ).join(' ')
+      ).toContain('control characters');
+    });
+
+    it('rejects a missing origins array', () => {
+      expect(
+        validateConfig(withDirectives([{ directive: 'camera', state: 'ThisSite' }])).join(' ')
+      ).toContain('origins');
     });
   });
 
@@ -234,7 +396,19 @@ describe('export/import round trip', () => {
       { id: 'h1', headerName: 'X-Frame-Options', behavior: CustomHeaderBehavior.Add, headerValue: 'DENY' },
       { id: 'h2', headerName: 'Server', behavior: CustomHeaderBehavior.Remove, headerValue: '' },
       { id: 'h3', headerName: 'X-Netcel-Trace', behavior: CustomHeaderBehavior.Disabled, headerValue: 'off' }
-    ]
+    ],
+    permissionPolicy: {
+      isEnabled: true,
+      directives: [
+        { directive: 'camera', state: PermissionPolicyState.None, origins: [] },
+        { directive: 'fullscreen', state: PermissionPolicyState.ThisSite, origins: [] },
+        {
+          directive: 'geolocation',
+          state: PermissionPolicyState.ThisAndSpecificSites,
+          origins: ['https://maps.example.com']
+        }
+      ]
+    }
   });
 
   it('accepts a fully populated document back after serialisation', () => {

@@ -18,6 +18,7 @@ import { useSecurityConfig } from './console/useSecurityConfig.js';
 import { DiagnosticsPanel } from './console/DiagnosticsPanel.js';
 import { ResponseHeaders } from './console/ResponseHeaders.js';
 import { Csp } from './console/Csp.js';
+import { PermissionPolicy } from './console/PermissionPolicy.js';
 import { HeaderPreview } from './console/HeaderPreview.js';
 import { Tools } from './console/Tools.js';
 import {
@@ -34,11 +35,12 @@ import {
 
 import { Notice } from './console/ui.js';
 
-type Tab = 'headers' | 'csp' | 'preview' | 'tools';
+type Tab = 'headers' | 'csp' | 'permissions' | 'preview' | 'tools';
 
 const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
   { id: 'headers', label: 'Response headers' },
   { id: 'csp', label: 'Content Security Policy' },
+  { id: 'permissions', label: 'Permissions Policy' },
   { id: 'preview', label: 'Preview' },
   { id: 'tools', label: 'Tools' }
 ];
@@ -136,6 +138,10 @@ function SecurityConsole({ context }: { context: ExtensionContext }): React.JSX.
 
         <TabsContent value="csp" mt="16">
           <Csp config={state.config} onChange={state.update} />
+        </TabsContent>
+
+        <TabsContent value="permissions" mt="16">
+          <PermissionPolicy config={state.config} onChange={state.update} />
         </TabsContent>
 
         <TabsContent value="preview" mt="16">
