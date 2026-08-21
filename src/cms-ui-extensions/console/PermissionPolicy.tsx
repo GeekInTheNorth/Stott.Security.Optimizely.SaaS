@@ -437,20 +437,25 @@ function EditDirectiveForm({
   const filled = origins.filter((origin) => origin.url.trim().length > 0);
 
   const apply = (): void => {
-    if (carriesOrigins) {
-      if (filled.length === 0) {
-        // `validateConfig` rejects this, so applying it would leave a draft that
-        // cannot be saved — reported by the server rather than by the field that
-        // caused it.
-        setError('Add at least one origin, or choose a different option.');
-        return;
-      }
+    // Only the "at least one" rule depends on the state: `validateConfig`
+    // requires origins for these two states and no others.
+    if (carriesOrigins && filled.length === 0) {
+      // `validateConfig` rejects this, so applying it would leave a draft that
+      // cannot be saved — reported by the server rather than by the field that
+      // caused it.
+      setError('Add at least one origin, or choose a different option.');
+      return;
+    }
 
-      const invalid = filled.find((origin) => !isValidPermissionPolicyOrigin(origin.url));
-      if (invalid) {
-        setError(`'${invalid.url.trim()}' is not a valid origin. ${PERMISSION_POLICY_ORIGIN_RULE}`);
-        return;
-      }
+    // Deliberately NOT gated on `carriesOrigins`. Origins are retained when the
+    // state stops needing them, and `validateConfig` checks every non-blank
+    // origin whatever the state — so gating this would let an editor enter a
+    // malformed origin, switch to Allow none, apply, and only discover it when
+    // Save failed with a server message pointing at no field in particular.
+    const invalid = filled.find((origin) => !isValidPermissionPolicyOrigin(origin.url));
+    if (invalid) {
+      setError(`'${invalid.url.trim()}' is not a valid origin. ${PERMISSION_POLICY_ORIGIN_RULE}`);
+      return;
     }
 
     // Origins are kept even when the chosen state ignores them, so switching to
@@ -491,12 +496,24 @@ function EditDirectiveForm({
             </Select>
           </Field>
 
-          {carriesOrigins && (
+          {/* Shown when the state uses origins, and *also* whenever any are
+              retained. Origins survive a switch to a state that ignores them, and
+              they are still validated — so hiding them would leave an editor
+              blocked by a malformed value in a field they cannot see. Keeping
+              them on screen also makes the retention visible rather than a
+              surprise on switching back. */}
+          {(carriesOrigins || filled.length > 0) && (
             <Box asChild>
               <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
                 <Text asChild fontWeight="600" mb="8">
                   <legend>Third party websites</legend>
                 </Text>
+
+                {!carriesOrigins && (
+                  <Text color="fg.tertiary" mb="8">
+                    Kept in case you switch back, but not applied while this option is selected.
+                  </Text>
+                )}
 
                 <Group flexDirection="column" gap="8" w="full">
                   {origins.map((origin) => (

@@ -99,10 +99,21 @@ export function validateConfig(config: unknown): string[] {
   if (doc.permissionPolicy !== undefined) {
     if (typeof doc.permissionPolicy !== 'object' || doc.permissionPolicy === null) {
       errors.push('`permissionPolicy` must be an object.');
-    } else if (!Array.isArray(doc.permissionPolicy.directives)) {
-      errors.push('Configuration is missing a `permissionPolicy.directives` array.');
     } else {
-      errors.push(...validatePermissionPolicy(doc.permissionPolicy.directives));
+      // Checked rather than defaulted: a document carrying directives but no
+      // flag would be stored and then treated as disabled, so a configured
+      // policy would silently emit nothing. Stricter than the `settings` and
+      // `sandbox` sections, deliberately — this one has a state where being
+      // wrong is invisible.
+      if (typeof doc.permissionPolicy.isEnabled !== 'boolean') {
+        errors.push('`permissionPolicy.isEnabled` must be true or false.');
+      }
+
+      if (!Array.isArray(doc.permissionPolicy.directives)) {
+        errors.push('Configuration is missing a `permissionPolicy.directives` array.');
+      } else {
+        errors.push(...validatePermissionPolicy(doc.permissionPolicy.directives));
+      }
     }
   }
 
@@ -147,6 +158,17 @@ function validatePermissionPolicy(
     if (!Array.isArray(entry.origins)) {
       errors.push(`${label} ('${entry.directive}') is missing an \`origins\` array.`);
       return;
+    }
+
+    // Non-string elements have to be rejected explicitly, not merely skipped.
+    // `isNonEmptyString` already excludes them from `origins` below, which means
+    // validation would pass in silence and leave the value in the stored
+    // document — where `toPolicyFragment` calls `trim()` on it and throws, so a
+    // malformed import would resurface as a 500 on the next status or publish.
+    if (entry.origins.some((origin) => typeof origin !== 'string')) {
+      errors.push(
+        `${label} ('${entry.directive}') has an origin that is not text. Origins must be strings.`
+      );
     }
 
     const origins = entry.origins.filter((origin) => isNonEmptyString(origin));

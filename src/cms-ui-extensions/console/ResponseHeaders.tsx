@@ -61,6 +61,7 @@ import {
 } from '../../shared/header-rules.js';
 import {
   findStandardHeader,
+  isFixedHeader,
   toConfiguredRow,
   toDefaultRow,
   type HeaderRowModel
@@ -552,6 +553,19 @@ function ValueSelector({
  * exactly what a save would — the alternative is an editor typing a name, saving,
  * and being told by the server that it was never allowed.
  */
+/**
+ * Why a name cannot be used for a new custom header, if it cannot.
+ *
+ * Three distinct reasons, and they must not be conflated — the eight standard
+ * headers are all in `takenNames` (the backend materialises every one as a
+ * `Disabled` row), so without the checks below they would report as duplicates.
+ * "Another header is already configured with this name" is untrue of a standard
+ * header nobody has touched, and sends the editor looking for a clash that is
+ * really just its own card sitting further down the list.
+ *
+ * Order is deliberate: most specific reason first, so the generic duplicate
+ * message only ever describes an actual custom row.
+ */
 function describeNameProblem(headerName: string, duplicate: boolean): string | undefined {
   const trimmed = headerName.trim();
 
@@ -563,14 +577,23 @@ function describeNameProblem(headerName: string, duplicate: boolean): string | u
     return `Not a valid HTTP header name. ${HEADER_NAME_RULE}`;
   }
 
-  if (duplicate) {
-    return 'Another header is already configured with this name.';
+  // One of the standard eight. It already has a card of its own — adding a
+  // second row for the same name is not how it gets configured.
+  if (isFixedHeader(trimmed)) {
+    return (
+      `${trimmed} is one of the standard headers this app manages. ` +
+      'Find its card below and set its behaviour there.'
+    );
   }
 
-  // Headers the engine compiles from another tab. A second header of the same
-  // name would compete with it, and nothing here would show that.
+  // Compiled by the engine from another tab. A second header of the same name
+  // would compete with it, and nothing here would show that.
   if (RESERVED_HEADER_NAMES.has(trimmed.toLowerCase())) {
     return 'This header is managed by this app. Configure it on its own tab instead.';
+  }
+
+  if (duplicate) {
+    return 'Another header is already configured with this name.';
   }
 
   return undefined;

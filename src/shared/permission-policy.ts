@@ -554,10 +554,15 @@ export function remapLegacyPermissionPolicy(
 ): { directives: PermissionPolicyDirectiveConfig[]; dropped: string[] } {
   const dropped: string[] = [];
   const remapped: PermissionPolicyDirectiveConfig[] = [];
+  // `entry?.` and not `entry.`: this runs on an untrusted import *before*
+  // `validateConfig`, so a null row or a non-string name has to survive the walk
+  // and reach validation. Throwing here would surface a malformed payload as a
+  // generic 500 rather than the 400 that names the offending row.
   const taken = new Set(
     directives
-      .map((entry) => entry.directive?.toLowerCase())
+      .map((entry) => entry?.directive)
       .filter((name): name is string => typeof name === 'string')
+      .map((name) => name.toLowerCase())
   );
 
   for (const entry of directives) {

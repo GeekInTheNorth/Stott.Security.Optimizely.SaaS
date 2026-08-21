@@ -427,6 +427,34 @@ describe('remapping a PaaS document', () => {
     expect(directives).toEqual(original);
     expect(dropped).toEqual([]);
   });
+
+  /**
+   * This runs on an untrusted import *before* `validateConfig`, so a malformed
+   * row has to survive the walk and reach validation. Throwing here would report
+   * a bad payload as a generic 500 instead of the 400 that names the row.
+   */
+  it.each([
+    ['a null row', [null]],
+    ['a row with no directive', [{ state: PermissionPolicyState.None, origins: [] }]],
+    ['a non-string directive', [{ directive: 42, state: PermissionPolicyState.None, origins: [] }]],
+    ['a null directive', [{ directive: null, state: PermissionPolicyState.None, origins: [] }]]
+  ])('passes %s through without throwing', (_label, rows) => {
+    const input = rows as unknown as PermissionPolicyDirectiveConfig[];
+
+    expect(() => remapLegacyPermissionPolicy(input)).not.toThrow();
+    expect(remapLegacyPermissionPolicy(input).directives).toHaveLength(1);
+  });
+
+  it('still remaps the valid rows alongside a malformed one', () => {
+    const input = [
+      null,
+      directive('opt-credentials', PermissionPolicyState.ThisSite)
+    ] as unknown as PermissionPolicyDirectiveConfig[];
+
+    const { directives } = remapLegacyPermissionPolicy(input);
+
+    expect(directives.map((d) => d?.directive)).toEqual([undefined, 'otp-credentials']);
+  });
 });
 
 /**

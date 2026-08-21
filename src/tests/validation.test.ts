@@ -328,6 +328,59 @@ describe('validateConfig', () => {
         validateConfig(withDirectives([{ directive: 'camera', state: 'ThisSite' }])).join(' ')
       ).toContain('origins');
     });
+
+    /**
+     * A non-string origin is excluded from the strings `validatePermissionPolicy`
+     * inspects, so without an explicit check it would validate in silence and
+     * stay in the stored document — where `toPolicyFragment` calls `trim()` on it
+     * and throws, resurfacing a malformed import as a 500 on the next publish.
+     */
+    it.each([[42], [null], [{}], [['nested']], [true]])(
+      'rejects the non-string origin %j',
+      (origin) => {
+        const errors = validateConfig(
+          withDirectives([
+            { directive: 'camera', state: 'SpecificSites', origins: [origin] }
+          ])
+        );
+
+        expect(errors.join(' ')).toContain('not text');
+      }
+    );
+
+    it('still accepts a blank string among the origins', () => {
+      expect(
+        validateConfig(
+          withDirectives([
+            {
+              directive: 'camera',
+              state: 'SpecificSites',
+              origins: ['https://www.example.com', '']
+            }
+          ])
+        )
+      ).toEqual([]);
+    });
+
+    // A document carrying directives but no flag would be stored and then
+    // treated as disabled, so a configured policy would emit nothing at all.
+    it.each([undefined, null, 'true', 1])('rejects isEnabled of %j', (isEnabled) => {
+      const doc = {
+        ...valid(),
+        permissionPolicy: { isEnabled, directives: [] }
+      };
+
+      expect(validateConfig(doc).join(' ')).toContain('isEnabled');
+    });
+
+    it.each([true, false])('accepts isEnabled of %j', (isEnabled) => {
+      const doc = {
+        ...valid(),
+        permissionPolicy: { isEnabled, directives: [] }
+      };
+
+      expect(validateConfig(doc)).toEqual([]);
+    });
   });
 
   describe('report collector URL', () => {
