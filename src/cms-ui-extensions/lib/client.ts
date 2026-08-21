@@ -18,6 +18,7 @@ import {
   type ConfigDocumentPayload,
   type DraftResult,
   type Envelope,
+  type ImportResult,
   type IntegrationResult,
   type PublishResult,
   type Scope,
@@ -112,7 +113,7 @@ export function createClient(context: ExtensionContext) {
     exportConfig: (scope: Scope) => invoke<ConfigDocument>(context, Actions.Export, { ...scope }),
 
     importConfig: (scope: Scope, config: ConfigDocumentPayload) =>
-      invoke<DraftResult>(context, Actions.Import, { ...scope, config }),
+      invoke<ImportResult>(context, Actions.Import, { ...scope, config }),
 
     getIntegration: () => invoke<IntegrationResult>(context, Actions.GetIntegration, {})
   };

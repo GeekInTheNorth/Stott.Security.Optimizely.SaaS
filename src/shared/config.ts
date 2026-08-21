@@ -43,6 +43,56 @@ export interface CustomHeaderConfig {
   readonly headerValue: string;
 }
 
+/**
+ * What a Permissions Policy directive permits. Mirrors
+ * `PermissionPolicyEnabledState`, minus its integer values — the PaaS column
+ * stores the member *name*, so the names are the wire format either way.
+ *
+ * `Disabled` and `None` are not the same thing and must not be collapsed:
+ * `Disabled` omits the directive so the browser default applies, whereas `None`
+ * emits `()` and blocks the feature outright.
+ */
+export const PermissionPolicyState = {
+  Disabled: 'Disabled',
+  None: 'None',
+  All: 'All',
+  ThisSite: 'ThisSite',
+  ThisAndSpecificSites: 'ThisAndSpecificSites',
+  SpecificSites: 'SpecificSites'
+} as const;
+
+export type PermissionPolicyStateValue =
+  (typeof PermissionPolicyState)[keyof typeof PermissionPolicyState];
+
+/**
+ * One directive's configuration.
+ *
+ * No `id`: the directive name is the identity, unique within a document, exactly
+ * as a header name is. PaaS carries a `Guid` per origin, regenerated on every
+ * read purely as React key material — which then leaks into its export. Origins
+ * are plain strings here and the edit dialog generates its own keys locally.
+ *
+ * `origins` is only meaningful for `SpecificSites` and `ThisAndSpecificSites`.
+ * It is retained rather than cleared when the state changes away from those, so
+ * an editor who switches to `None` and back does not lose their list.
+ */
+export interface PermissionPolicyDirectiveConfig {
+  readonly directive: string;
+  readonly state: PermissionPolicyStateValue;
+  readonly origins: readonly string[];
+}
+
+/**
+ * Only directives the customer has touched are stored; the console materialises
+ * the full set from `PERMISSION_POLICY_DIRECTIVES`. Mirrors the PaaS model,
+ * where the table holds a row per configured directive and the API synthesises
+ * the rest as `Disabled`.
+ */
+export interface PermissionPolicyConfig {
+  readonly isEnabled: boolean;
+  readonly directives: readonly PermissionPolicyDirectiveConfig[];
+}
+
 /** Derived from {@link SANDBOX_TOKENS} so the two cannot drift apart. */
 export type SandboxFlag = (typeof SANDBOX_TOKENS)[number][0];
 
@@ -86,6 +136,7 @@ export interface ConfigDocument {
   readonly sandbox: SandboxConfig;
   readonly sources: readonly CspSourceConfig[];
   readonly headers: readonly CustomHeaderConfig[];
+  readonly permissionPolicy: PermissionPolicyConfig;
 }
 
 /**
@@ -120,12 +171,40 @@ export const EMPTY_SETTINGS: CspSettingsConfig = {
   externalReportToUrl: ''
 };
 
+export const EMPTY_PERMISSION_POLICY: PermissionPolicyConfig = {
+  isEnabled: false,
+  directives: []
+};
+
 export function createEmptyConfig(): ConfigDocument {
   return {
     version: 1,
     settings: EMPTY_SETTINGS,
     sandbox: { isSandboxEnabled: false },
     sources: [],
-    headers: []
+    headers: [],
+    permissionPolicy: EMPTY_PERMISSION_POLICY
   };
+}
+
+/**
+ * Fills in sections a document does not carry.
+ *
+ * `readDraft` casts stored JSON straight to `ConfigDocument`, so a draft written
+ * before a section existed would hand the engine `undefined` where the type
+ * promises an object. Every installation that predates a new section is in that
+ * state, which makes this the difference between an added section working and the
+ * console throwing on load.
+ *
+ * Only ever adds. A section that is present is passed through **verbatim, even if
+ * it is malformed** — `validateConfig` is the single judge of that, and coercing
+ * a nonsense value into a valid default here would make its rules unreachable
+ * from the import path, which runs this first.
+ */
+export function normaliseConfig(config: ConfigDocument): ConfigDocument {
+  if (config.permissionPolicy !== undefined && config.permissionPolicy !== null) {
+    return config;
+  }
+
+  return { ...config, permissionPolicy: EMPTY_PERMISSION_POLICY };
 }

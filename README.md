@@ -4,13 +4,15 @@ An [Optimizely Connect Platform](https://docs.developers.optimizely.com/optimize
 app that adds a full-page security console to Optimizely CMS (SaaS), and serves
 the resulting HTTP response headers to your site's front end.
 
-It manages two things:
+It manages three things:
 
 - **Content Security Policy** — built from a domain-based permission model
   ("allow scripts from `google.com`") rather than hand-assembled directives,
   with automatic splitting when a policy outgrows what a CDN will carry.
 - **Response headers** — the eight standard security headers, plus any custom
   header you want added to or removed from responses.
+- **Permissions Policy** — which browser features the site and its embedded third
+  parties may use, per directive.
 
 Editors work on a **draft**. Publishing compiles that draft and writes the result
 to a public endpoint; nothing a customer's site serves changes until they do.

@@ -13,6 +13,6 @@ sections:
       - type: instructions
         text: >
           Everything is configured in the security console: In the CMS, go to Extensions in the left hand menu and then open **Stott Security**.
-          Content Security Policy and Response Headers, Previews and Import/Export tooling all live there.
+          Content Security Policy, Permissions Policy and Response Headers, Previews and Import/Export tooling all live there.
 
           Edits are held as a draft. Nothing your site serves changes until you publish from the console.
