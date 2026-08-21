@@ -16,6 +16,7 @@ import {
   type ConfigDocument
 } from '../shared/config.js';
 import { Directives } from '../shared/constants.js';
+import { CSP_SOURCE_RULE } from '../shared/csp-source-rules.js';
 import { validateConfig } from '../backend/lib/validation.js';
 import { analyseCsp, compileWithDiagnostics } from '../backend/core/index.js';
 import { fallbackChain, compiledKey, draftKey, measureConfig } from '../backend/lib/storage.js';
@@ -89,6 +90,62 @@ describe('validateConfig', () => {
       };
 
       expect(validateConfig(doc).join(' ')).toContain('control characters');
+    });
+
+    it('rejects a source that is not a valid CSP source', () => {
+      const doc = {
+        ...valid(),
+        sources: [{ id: 's', source: 'example-com', directives: ['default-src'] }]
+      };
+      const reported = validateConfig(doc).join(' ');
+
+      expect(reported).toContain('example-com');
+      expect(reported).toContain(CSP_SOURCE_RULE);
+    });
+
+    // One failed save should hand back the whole work list, because a single
+    // malformed value blocks every save until it is corrected.
+    it('reports every invalid source, not just the first', () => {
+      const doc = {
+        ...valid(),
+        sources: [
+          { id: 's1', source: 'https://*', directives: ['default-src'] },
+          { id: 's2', source: 'ftp://x.com', directives: ['default-src'] },
+          { id: 's3', source: "'SELF'", directives: ['default-src'] }
+        ]
+      };
+
+      expect(validateConfig(doc).filter((e) => e.includes('not a valid CSP source'))).toHaveLength(
+        3
+      );
+    });
+
+    it('reports a malformed source alongside its missing directives', () => {
+      const doc = { ...valid(), sources: [{ id: 's', source: 'example-com', directives: [] }] };
+      const reported = validateConfig(doc).join(' ');
+
+      expect(reported).toContain('not a valid CSP source');
+      expect(reported).toContain('no directives');
+    });
+
+    it('accepts a wildcard source with a path', () => {
+      const doc = {
+        ...valid(),
+        sources: [
+          { id: 's', source: 'https://*.example.com/assets/app.js', directives: ['script-src'] }
+        ]
+      };
+
+      expect(validateConfig(doc)).toEqual([]);
+    });
+
+    it('accepts a hash source', () => {
+      const doc = {
+        ...valid(),
+        sources: [{ id: 's', source: "'sha256-AbCdEf123='", directives: ['script-src'] }]
+      };
+
+      expect(validateConfig(doc)).toEqual([]);
     });
   });
 

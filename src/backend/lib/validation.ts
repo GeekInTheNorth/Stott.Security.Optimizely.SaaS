@@ -9,11 +9,13 @@
  *      output and serves it, so anything malformed that gets stored is served to
  *      a live site. Validation has to happen on the way in.
  *
- * These rules are deliberately structural. Source-value rules (is this a valid
- * CSP source?) belong in `shared/` so the console can apply them live — they are
- * a separate concern and follow with the console work. Header name and value
- * rules already live there, in `shared/header-rules.ts`, because a customer
- * types their own header names: the console has to reject what this would.
+ * These rules are deliberately structural. Value rules live in `shared/` so the
+ * console can apply them as they are typed — CSP sources in
+ * `shared/csp-source-rules.ts`, header names and values in
+ * `shared/header-rules.ts`, Permissions Policy origins in
+ * `shared/permission-policy.ts`. This module is still what enforces them; both
+ * halves must reject the same thing, or the console will build a document that
+ * the save refuses.
  */
 
 import {
@@ -25,6 +27,7 @@ import {
   type PermissionPolicyDirectiveConfig
 } from '../../shared/config.js';
 import { ALL_DIRECTIVES } from '../../shared/constants.js';
+import { CSP_SOURCE_RULE, isValidCspSource } from '../../shared/csp-source-rules.js';
 import {
   HEADER_NAME_RULE,
   RESERVED_HEADER_NAMES,
@@ -213,6 +216,13 @@ function validateSources(sources: readonly CspSourceConfig[]): string[] {
 
     if (hasControlCharacters(source.source)) {
       errors.push(`${label} ('${source.source}') contains control characters.`);
+    }
+
+    // No `return`, matching the control-character branch above: a row with both a
+    // malformed value and no directives should report both, so one failed save
+    // hands back the whole work list.
+    if (!isValidCspSource(source.source)) {
+      errors.push(`${label} ('${source.source}') is not a valid CSP source. ${CSP_SOURCE_RULE}`);
     }
 
     if (!Array.isArray(source.directives) || source.directives.length === 0) {

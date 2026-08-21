@@ -1,0 +1,7 @@
+{
+  "app": {
+    "buildCommand": "npm run build",
+    "watchPaths": ["src/**/*", "app.yml"],
+    "ignorePaths": ["**/*.test.ts", "dist/**", ".ocp-local/**"]
+  }
+}

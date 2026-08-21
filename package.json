@@ -12,13 +12,14 @@
   "packageManager": "npm@10.9.4",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "dev": "npx --yes @optimizely/ocp-cli-v2 dev --config ocp-dev.config.json",
     "clean": "rimraf dist",
     "build": "npm run clean && vite build --config vite.backend.config.mjs && vite build --config vite.ui.config.mjs",
     "lint": "eslint src --ext ts,tsx",
     "test": "vitest run --passWithNoTests",
     "validate": "npm run lint && npm run typecheck && npm run build && cross-env LOG_LEVEL=NEVER ocp-app-sdk validate"
   },
-  "//dependencies": "@optimizely/ocp-cms-ui-extensions-sdk is PINNED to 1.0.0-beta.4. The template ships `latest`, which resolves to 1.0.0-beta.1 — that version declares UI_EXTENSION_INJECTION_POINTS as ['sidebar'] only and REJECTS the 'view' (full page) surface this app depends on. Do not relax to latest or ^ without re-checking dist/AppManifest.d.ts.",
+  "//dependencies": "@optimizely/ocp-cms-ui-extensions-sdk is PINNED to 1.0.0-beta.4. The template ships `latest`, which resolves to 1.0.0-beta.1 \u2014 that version declares UI_EXTENSION_INJECTION_POINTS as ['sidebar'] only and REJECTS the 'view' (full page) surface this app depends on. Do not relax to latest or ^ without re-checking dist/AppManifest.d.ts.",
   "dependencies": {
     "@optiaxiom/react": "^3.0.0",
     "@optimizely/cms-extensibility-sdk": "1.0.1",

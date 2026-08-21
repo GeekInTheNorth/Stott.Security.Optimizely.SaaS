@@ -24,6 +24,7 @@ import { useMemo, useState } from 'react';
 
 import type { ConfigDocument, CspSourceConfig } from '../../shared/config.js';
 import { Sources } from '../../shared/constants.js';
+import { CSP_SOURCE_RULE, isValidCspSource } from '../../shared/csp-source-rules.js';
 import {
   Box,
   Button,
@@ -50,9 +51,11 @@ import './card-grid.css';
  * Suggestions offered in the source field, matching the existing PaaS UI
  * (`CSP/PermissionModal.jsx`) so the two products behave alike.
  *
- * The keyword block is in `ALL_SOURCES` order — the same precedence the engine
- * sorts by — followed by common third-party wildcards, which carry a friendlier
- * label than the value itself.
+ * The keyword block is in display order, leading with `'self'` as the one an
+ * editor reaches for most. That is deliberately *not* `ALL_SOURCES` order, which
+ * is the precedence the engine sorts by and has no bearing on what reads well in
+ * a list. Common third-party wildcards follow, carrying a friendlier label than
+ * the value itself.
  *
  * `'nonce-random'` and `'strict-dynamic'` are here, not on the Settings tab:
  * they are sources granted to directives like any other. The `IsNonceEnabled`
@@ -86,6 +89,17 @@ const KEYWORD_SUGGESTIONS: ReadonlyArray<{ value: string; label?: string }> = [
     label: 'https://www.google-analytics.com (and subdomains)'
   }
 ];
+
+/**
+ * The last sentence is not padding. `toLowerSource` in the engine lower-cases the
+ * whole value, path included, faithfully mirroring PaaS — so a source given as
+ * `/Scripts/App.js` is emitted as `/scripts/app.js` and matches nothing. The
+ * console is the only place that can warn about it.
+ */
+const ADD_SOURCE_DESCRIPTION =
+  'A domain such as https://cdn.example.com — optionally with a leading *. wildcard, a port ' +
+  "or a path — a scheme such as data:, or a keyword such as 'self'. A path is lower-cased " +
+  'when the policy is compiled, so give it in lower case.';
 
 export function CspSources({
   config,
@@ -188,6 +202,7 @@ export function CspSources({
           <SourceCard
             key={source.id}
             source={source}
+            takenSources={takenSources}
             editing={editing === source.id}
             onEdit={() => setEditing(source.id)}
             onCloseEdit={() => setEditing(undefined)}
@@ -278,16 +293,19 @@ function AddSourceForm({
 
   return (
     <>
-      <DialogHeader description="A domain, a scheme such as data:, or a keyword such as 'self'.">
-        Add a source
-      </DialogHeader>
+      <DialogHeader description={ADD_SOURCE_DESCRIPTION}>Add a source</DialogHeader>
 
       <DialogBody>
         <Group flexDirection="column" gap="16" w="full">
           <Field label="Source" error={sourceError} w="full">
+            {/* The border reacts per keystroke, the message does not: one that
+                appears at `h`, `ht`, `htt` is noise. */}
             <Input
               value={source}
-              error={sourceError !== undefined}
+              error={
+                sourceError !== undefined ||
+                (source.trim().length > 0 && !isValidCspSource(source))
+              }
               w="full"
               placeholder="https://cdn.example.com"
               list="csp-keyword-suggestions"
@@ -304,13 +322,7 @@ function AddSourceForm({
             />
           </Field>
 
-          <datalist id="csp-keyword-suggestions">
-            {KEYWORD_SUGGESTIONS.map((suggestion) => (
-              <option key={suggestion.value} value={suggestion.value}>
-                {suggestion.label}
-              </option>
-            ))}
-          </datalist>
+          <KeywordSuggestions />
 
           <Field error={directiveError} w="full">
             <DirectiveChecklist
@@ -339,6 +351,7 @@ function AddSourceForm({
 
 function SourceCard({
   source,
+  takenSources,
   editing,
   onEdit,
   onCloseEdit,
@@ -346,12 +359,15 @@ function SourceCard({
   onRemove
 }: {
   source: CspSourceConfig;
+  takenSources: ReadonlySet<string>;
   editing: boolean;
   onEdit: () => void;
   onCloseEdit: () => void;
   onChange: (patch: Partial<CspSourceConfig>) => void;
   onRemove: () => void;
 }): React.JSX.Element {
+  const invalid = !isValidCspSource(source.source);
+
   return (
     <Card p="16">
       {/* `w="full"` on the stack: without it the column is only as wide as its
@@ -376,6 +392,15 @@ function SourceCard({
           </Text>
         )}
 
+        {/* A value predating the source rules blocks *every* save, on every tab,
+            because `validateConfig` judges the whole document. Saying so on the
+            card is what turns an unsaveable console into a work list. */}
+        {invalid && (
+          <Notice intent="warning" title="This source cannot be saved.">
+            {CSP_SOURCE_RULE} Edit the source to correct it.
+          </Notice>
+        )}
+
         {/* Actions at the foot of the card, as on a response header card. Cards
             sitting side by side vary in height with their directive lists, so
             buttons on the top row land at a different place in each one. */}
@@ -394,6 +419,7 @@ function SourceCard({
 
         <DirectiveDialog
           source={source}
+          takenSources={takenSources}
           open={editing}
           onOpenChange={(next) => (next ? onEdit() : onCloseEdit())}
           onChange={onChange}
@@ -404,24 +430,27 @@ function SourceCard({
 }
 
 /**
- * The directive picker.
+ * The directive picker, and the repair path for a source value that predates the
+ * source rules.
  *
  * Edits are held locally and only reach the in-memory draft when **Apply** is
  * pressed. Cancelling — including Escape or clicking away, which a modal is
  * expected to treat as cancelling — discards them.
  *
  * The form is mounted only while open, so its initial state comes straight from
- * `source.directives` on each open with no effect needed to resynchronise it.
- * That is the whole reason for the split: a long-lived component holding a copy
- * of a prop is exactly the shape that goes stale.
+ * the source on each open with no effect needed to resynchronise it. That is the
+ * whole reason for the split: a long-lived component holding a copy of a prop is
+ * exactly the shape that goes stale.
  */
 function DirectiveDialog({
   source,
+  takenSources,
   open,
   onOpenChange,
   onChange
 }: {
   source: CspSourceConfig;
+  takenSources: ReadonlySet<string>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (patch: Partial<CspSourceConfig>) => void;
@@ -432,9 +461,10 @@ function DirectiveDialog({
         {open && (
           <DirectiveForm
             source={source}
+            takenSources={takenSources}
             onCancel={() => onOpenChange(false)}
-            onApply={(directives) => {
-              onChange({ directives });
+            onApply={(patch) => {
+              onChange(patch);
               onOpenChange(false);
             }}
           />
@@ -446,26 +476,61 @@ function DirectiveDialog({
 
 function DirectiveForm({
   source,
+  takenSources,
   onCancel,
   onApply
 }: {
   source: CspSourceConfig;
+  takenSources: ReadonlySet<string>;
   onCancel: () => void;
-  onApply: (directives: readonly string[]) => void;
+  onApply: (patch: Partial<CspSourceConfig>) => void;
 }): React.JSX.Element {
+  const [value, setValue] = useState(source.source);
   const [selected, setSelected] = useState<readonly string[]>(source.directives);
+  const [valueError, setValueError] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
 
+  /**
+   * A source name is otherwise as fixed as a header name — it is chosen once, in
+   * the add dialog. The exception is a value that no longer validates: it blocks
+   * every save until it is corrected, and delete-and-re-add would discard the
+   * directives on the card. Editable only while invalid makes this a one-way
+   * ratchet towards a saveable document, never a rename.
+   *
+   * Read from the stored value, not the local one, so the field does not lock
+   * itself the moment the replacement becomes valid.
+   */
+  const repairable = !isValidCspSource(source.source);
+
+  /** Its own value is not a duplicate of itself. */
+  const otherSources = useMemo(() => {
+    const others = new Set(takenSources);
+    others.delete(source.source.trim().toLowerCase());
+    return others;
+  }, [takenSources, source.source]);
+
   const apply = (): void => {
+    const trimmed = value.trim();
+    const valueProblem = repairable ? describeSourceProblem(trimmed, otherSources) : undefined;
     // Same rule as the add dialog: revoking everything leaves a source that
     // `validateConfig` rejects, so it cannot be saved. Removing the source is
     // what "allow nothing" means.
-    if (selected.length === 0) {
-      setError('Choose at least one directive, or remove the source entirely.');
+    const directiveProblem =
+      selected.length === 0
+        ? 'Choose at least one directive, or remove the source entirely.'
+        : undefined;
+
+    setValueError(valueProblem);
+    setError(directiveProblem);
+
+    if (valueProblem !== undefined || directiveProblem !== undefined) {
       return;
     }
 
-    onApply(selected);
+    // The value only ever reaches the patch when it was repairable. A valid
+    // source is chosen once, in the add dialog, and Apply must not quietly
+    // rewrite it — not even to trim it.
+    onApply(repairable ? { source: trimmed, directives: selected } : { directives: selected });
   };
 
   return (
@@ -475,18 +540,42 @@ function DirectiveForm({
       </DialogHeader>
 
       <DialogBody>
-        <Field error={error} w="full">
-          <DirectiveChecklist
-            source={source.source}
-            selected={selected}
-            onToggle={(directive, granted) => {
-              setSelected((current) =>
-                granted ? [...current, directive] : current.filter((d) => d !== directive)
-              );
-              setError(undefined);
-            }}
-          />
-        </Field>
+        <Group flexDirection="column" gap="16" w="full">
+          {repairable && (
+            <>
+              <Field label="Source" error={valueError} w="full">
+                <Input
+                  value={value}
+                  error={valueError !== undefined || !isValidCspSource(value)}
+                  w="full"
+                  placeholder="https://cdn.example.com"
+                  list="csp-keyword-suggestions"
+                  onValueChange={(next) => {
+                    setValue(next);
+                    setValueError(undefined);
+                  }}
+                />
+              </Field>
+
+              <KeywordSuggestions />
+            </>
+          )}
+
+          <Field error={error} w="full">
+            {/* The live value, not the stored one, so the keyword notices track
+                what is being typed — as they do in the add dialog. */}
+            <DirectiveChecklist
+              source={value.trim()}
+              selected={selected}
+              onToggle={(directive, granted) => {
+                setSelected((current) =>
+                  granted ? [...current, directive] : current.filter((d) => d !== directive)
+                );
+                setError(undefined);
+              }}
+            />
+          </Field>
+        </Group>
       </DialogBody>
 
       <DialogFooter>
@@ -494,6 +583,23 @@ function DirectiveForm({
         <Button appearance="primary" onClick={apply}>Apply</Button>
       </DialogFooter>
     </>
+  );
+}
+
+/**
+ * The suggestion list, rendered by whichever dialog can accept a source value.
+ *
+ * Only one of the two is ever mounted, so the shared `id` cannot collide.
+ */
+function KeywordSuggestions(): React.JSX.Element {
+  return (
+    <datalist id="csp-keyword-suggestions">
+      {KEYWORD_SUGGESTIONS.map((suggestion) => (
+        <option key={suggestion.value} value={suggestion.value}>
+          {suggestion.label}
+        </option>
+      ))}
+    </datalist>
   );
 }
 
@@ -572,6 +678,12 @@ function describeSourceProblem(
 ): string | undefined {
   if (source.length === 0) {
     return 'Enter a domain, scheme or keyword.';
+  }
+
+  // Before the duplicate check: most specific reason first, so the generic
+  // "already listed" message only ever describes a source that could exist.
+  if (!isValidCspSource(source)) {
+    return `Not a valid CSP source. ${CSP_SOURCE_RULE}`;
   }
 
   if (takenSources.has(source.toLowerCase())) {

@@ -17,6 +17,12 @@ dist/
 *.log
 npm-debug.log*
 
+# `ocp dev` state: the local stand-ins for the installation's key-value,
+# settings and secrets stores, plus job history and emitted source data. Machine
+# -local and disposable — but `secrets.json` and the ODP API key from the Tool
+# Settings panel land here, so this must never be committed.
+.ocp-local/
+
 # Test and tool caches
 coverage/
 .vitest/

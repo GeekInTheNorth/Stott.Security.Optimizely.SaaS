@@ -10,11 +10,33 @@ before changing it.
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
 npx --yes @optimizely/ocp-cli-v2 app validate
+npm run dev            # local dev server on :3000, rebuilds on save
 ```
 
-Run all of them before deploying. There is no local preview — a CMS UI extension
-only runs inside the CMS — so a mistake costs a full publish cycle. The deploy
-loop is in the README.
+Run the first two before deploying. The deploy loop is in the README.
+
+`npm run dev` runs the OCP local environment, configured by
+`ocp-dev.config.json`. The dev server defaults to `yarn build`, which is why the
+config exists at all; it also watches `src/` and `app.yml` only, so editing a
+test does not trigger a rebuild. Pass CLI flags through with `--`, as in
+`npm run dev -- --port 4000`. Its state — the local stand-in for the
+installation's key-value, settings and secrets stores — lives in `.ocp-local/`,
+which is gitignored because the Tool Settings panel writes a real ODP API key
+there.
+
+It renders the console in an iframe and shims `invokeFunction`, so the backend
+can also be driven without a browser:
+
+```bash
+curl -s -X POST localhost:3000/devserver/api/cms-ui-extensions/functions/cms_extension \
+  -H 'Content-Type: application/json' -d '{"action":"getStatus","params":{}}'
+```
+
+What it does **not** reproduce is the CMS's sandboxed, cross-origin frame. Every
+constraint in *What the extension environment allows* below — fonts, downloads,
+popups — still needs a real deploy to confirm, and so does anything visual, since
+the CMS supplies the surrounding chrome. Treat it as a way to exercise logic and
+plumbing early, not as a substitute for the publish cycle.
 
 ## Architecture
 
@@ -263,5 +285,8 @@ Tools tab is what mitigates its impermanence.
   no narration of what the code used to do. If a decision has a rationale worth
   keeping, state it in the present tense.
 - **Tests** are Vitest, under `src/tests/`, covering the engine and validation.
-  The console is verified in the CMS rather than unit tested — so console changes
-  need a real deploy before they are considered done.
+  The console is not unit tested. `npm run dev` will exercise its logic and its
+  calls into the backend, but a console change is only done once it has been seen
+  in the CMS, which is the only place the real frame constraints apply. A rule the
+  console enforces belongs in `shared/` for this reason: there it is testable, and
+  both halves are guaranteed to agree.
