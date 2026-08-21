@@ -406,7 +406,7 @@ function SourceCard({
 /**
  * The directive picker.
  *
- * Edits are held locally and only reach the draft when **Save directives** is
+ * Edits are held locally and only reach the in-memory draft when **Apply** is
  * pressed. Cancelling — including Escape or clicking away, which a modal is
  * expected to treat as cancelling — discards them.
  *
@@ -491,9 +491,7 @@ function DirectiveForm({
 
       <DialogFooter>
         <Button onClick={onCancel}>Cancel</Button>
-        <Button appearance="primary" onClick={apply}>
-          Save directives
-        </Button>
+        <Button appearance="primary" onClick={apply}>Apply</Button>
       </DialogFooter>
     </>
   );

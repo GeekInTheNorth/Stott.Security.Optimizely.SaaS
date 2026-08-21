@@ -572,9 +572,7 @@ function EditDirectiveForm({
 
       <DialogFooter>
         <Button onClick={onCancel}>Cancel</Button>
-        <Button appearance="primary" onClick={apply}>
-          Save directive
-        </Button>
+        <Button appearance="primary" onClick={apply}>Apply</Button>
       </DialogFooter>
     </>
   );

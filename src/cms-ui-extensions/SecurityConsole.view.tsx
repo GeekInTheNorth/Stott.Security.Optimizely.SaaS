@@ -84,8 +84,36 @@ function SecurityConsole({ context }: { context: ExtensionContext }): React.JSX.
     <Shell>
       {/* No title of our own — the CMS extension chrome already shows one, and
           repeating it spends the most valuable row on the page saying nothing.
-          The publish state takes that space instead. */}
-      <Group gap="16" alignItems="center" flexWrap="wrap">
+          The publish state takes that space instead.
+
+          Sticky, because this row carries the only two actions in the console
+          and the lists below it are long — 48 permissions policy cards, or a
+          site's worth of CSP sources. Scrolled twenty cards down, an editor
+          would otherwise have to scroll back to the top to save, which is how
+          unsaved work gets lost.
+
+          `position`, `top` and `zIndex` are inline because `Group` exposes no
+          sprinkle for any of them. That is within the house rule: inline styles
+          are for one-off layout with no token, and the reason to avoid them —
+          they cannot express `:hover`, `:focus-visible` or `:disabled` — does
+          not apply to positioning.
+
+          `bg.page` rather than `bg.default`: it is the token Axiom paints
+          page-level surfaces with, so the row matches the body instead of
+          sitting on it as a white band. The background is load-bearing rather
+          than decoration — without one the cards would show straight through
+          the row as they scrolled under it. Matching the body then leaves no
+          edge at all, which reads as text being clipped mid-glyph, so
+          `shadow` supplies one. */}
+      <Group
+        gap="16"
+        alignItems="center"
+        flexWrap="wrap"
+        bg="bg.page"
+        shadow="sm"
+        py="12"
+        style={{ position: 'sticky', top: 0, zIndex: 10 }}
+      >
         {state.publishedAt && (
           <Text color="fg.tertiary">
             Live since {new Date(state.publishedAt).toLocaleString('en-GB')}
