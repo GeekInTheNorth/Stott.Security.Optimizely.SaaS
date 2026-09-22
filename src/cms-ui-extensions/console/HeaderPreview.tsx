@@ -187,7 +187,7 @@ function Integration({ client }: { client: SecurityClient }): React.JSX.Element 
       {state === 'unavailable' && (
         <Notice intent="warning">
           The endpoint could not be resolved. Run{' '}
-          <Code>ocp directory listFunctions stott_security &lt;trackerId&gt;</Code> to find it.
+          <Code>ocp directory listFunctions stott_security_saas &lt;trackerId&gt;</Code> to find it.
         </Notice>
       )}
 

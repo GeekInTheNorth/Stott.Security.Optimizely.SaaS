@@ -1,8 +1,8 @@
 meta:
-  app_id: stott_security
+  app_id: stott_security_saas
   display_name: Stott Security
-  version: 0.0.1-dev.37
-  vendor: netcel
+  version: 0.0.1-dev.1
+  vendor: mark_stott
   summary: Manage Content Security Policy and response headers for Optimizely CMS (SaaS).
   support_url: https://github.com/GeekInTheNorth/Stott.Security.Optimizely.SaaS
   contact_email: support@stott.pro
