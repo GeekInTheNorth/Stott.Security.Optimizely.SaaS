@@ -5,6 +5,29 @@ compiled HTTP response headers to a customer's front end. [README.md](README.md)
 covers what it is and how to deploy it; this file covers what you need to know
 before changing it.
 
+## Deployment Environments
+
+We are using different OCP accounts and environments for testing vs production deployment.  We want to change meta data at the top of app.yml depending on whether we are doing a deployment for test or a deployment for production.
+
+For testing, we deploy to the netcel instance using the following at the top of app.yml:
+```
+meta:
+  app_id: stott_security
+  display_name: Stott Security (Test)
+  version: 0.0.1-dev.38
+  vendor: netcel
+```
+
+For live deployments, we should use:
+```
+meta:
+  app_id: stott_security_saas
+  display_name: Stott Security
+  version: 1.0.0
+  vendor: mark_stott
+```
+
+
 ## Commands
 
 ```bash
