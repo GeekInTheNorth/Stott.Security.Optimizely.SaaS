@@ -1,7 +1,6 @@
 meta:
   app_id: stott_security_saas
   display_name: Stott Security
-  version: 0.0.1-dev.1
   vendor: mark_stott
   summary: Manage Content Security Policy and response headers for Optimizely CMS (SaaS).
   support_url: https://github.com/GeekInTheNorth/Stott.Security.Optimizely.SaaS
@@ -22,11 +21,13 @@ runtime: node22-cms-ext
 #
 #   export declare const UI_EXTENSION_INJECTION_POINTS: readonly ["sidebar", "view"];
 #
-# WARNING: @optimizely/ocp-cms-ui-extensions-sdk must not be installed from the
-# npm `latest` dist-tag, which resolves to a build declaring ["sidebar"] only and
-# rejects `view` at validation. package.json pins an exact version for this
-# reason — check UI_EXTENSION_INJECTION_POINTS in the installed package before
-# changing it.
+# WARNING: pre-release builds of @optimizely/ocp-cms-ui-extensions-sdk declare
+# ["sidebar"] only and reject `view` at validation. package.json pins an exact
+# version for this reason — check UI_EXTENSION_INJECTION_POINTS in the installed
+# package before changing it.
+#
+# The SDK's plugin requires CMS installation scope, so this app cannot also
+# declare data sync sources, destinations or Opal tool functions.
 #
 # Validator rules (from dist/validator.js):
 #   - `name` must be unique across ALL injection points
