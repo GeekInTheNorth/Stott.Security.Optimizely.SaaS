@@ -24,6 +24,7 @@ import { Tools } from './console/Tools.js';
 import {
   AxiomProvider,
   Badge,
+  Box,
   Button,
   Group,
   Tabs,
@@ -80,70 +81,98 @@ function SecurityConsole({ context }: { context: ExtensionContext }): React.JSX.
     );
   }
 
+  // Unsaved edits count as well as a saved draft: either way, what the editor
+  // is looking at is not what the site serves.
+  const differsFromLive = state.dirty || state.hasUnpublishedChanges;
+
+  // Only the next step is offered: save while there are unsaved edits, publish
+  // once a saved draft differs from what is live, and nothing once it matches.
+  // Each button also stays up while its own request runs — `save()` clears
+  // `dirty` before the status refresh lands, and `publish()` clears
+  // `hasUnpublishedChanges` before it finishes, so keying on those alone would
+  // make the button vanish mid-request. Save takes precedence so the two can
+  // never show together.
+  const showSave = state.dirty || state.saving;
+  const showPublish = !showSave && (state.hasUnpublishedChanges || state.publishing);
+
   return (
     <Shell>
       {/* No title of our own — the CMS extension chrome already shows one, and
           repeating it spends the most valuable row on the page saying nothing.
           The publish state takes that space instead.
 
-          Sticky, because this row carries the only two actions in the console
+          Sticky, because this row carries the console's save and publish actions
           and the lists below it are long — 48 permissions policy cards, or a
           site's worth of CSP sources. Scrolled twenty cards down, an editor
           would otherwise have to scroll back to the top to save, which is how
           unsaved work gets lost.
 
-          `position`, `top` and `zIndex` are inline because `Group` exposes no
-          sprinkle for any of them. That is within the house rule: inline styles
-          are for one-off layout with no token, and the reason to avoid them —
-          they cannot express `:hover`, `:focus-visible` or `:disabled` — does
-          not apply to positioning.
+          `position` and `top` are inline because `Box` exposes no sprinkle for
+          either. That is within the house rule: inline styles are for one-off
+          layout with no token, and the reason to avoid them — they cannot
+          express `:hover`, `:focus-visible` or `:disabled` — does not apply to
+          positioning.
 
-          `bg.page` rather than `bg.default`: it is the token Axiom paints
-          page-level surfaces with, so the row matches the body instead of
-          sitting on it as a white band. The background is load-bearing rather
-          than decoration — without one the cards would show straight through
-          the row as they scrolled under it. Matching the body then leaves no
-          edge at all, which reads as text being clipped mid-glyph, so
-          `shadow` supplies one. */}
-      <Group
-        gap="16"
+          The background is load-bearing rather than decoration — without one
+          the cards would show straight through the row as they scrolled under
+          it. Its colour carries the publish state: amber while anything on screen
+          differs from what is live, green once it all matches. Each background is
+          paired with the foreground that keeps its contrast in both themes.
+          `bg.success.hovered` is the only dark green Axiom has — `bg.success`
+          and `bg.accent` are both the bright lime — and it turns pale in dark
+          mode, so it takes `fg.default.inverse`, which flips with it.
+          `fg.warning.inverse` is Axiom's own pairing for `bg.warning`. The
+          badge stays alongside the amber, because colour alone does not say
+          what the state is.
+
+          One flat row: `flex-end` keeps the actions on the right, and the
+          status text's `mr="auto"` pushes it to the left. The status text is
+          conditional, so `space-between` would swing the actions across to the
+          left whenever nothing has been published yet. */}
+      <Box
+        display="flex"
+        bg={differsFromLive ? 'bg.warning' : 'bg.success.hovered'}
+        gap="12"
         alignItems="center"
+        justifyContent="flex-end"
         flexWrap="wrap"
-        bg="bg.page"
         shadow="sm"
+        px="16"
         py="12"
-        style={{ position: 'sticky', top: 0, zIndex: 10 }}
+        z="10"
+        style={{ position: 'sticky', top: 0 }}
       >
         {state.publishedAt && (
-          <Text color="fg.tertiary">
+          <Text
+            color={differsFromLive ? 'fg.warning.inverse' : 'fg.default.inverse'}
+            mr="auto"
+          >
             Live since {new Date(state.publishedAt).toLocaleString('en-GB')}
-            {state.publishedBy ? ` — published by ${state.publishedBy}` : ''}
           </Text>
         )}
 
-        {/* ml="auto" rather than justifyContent="space-between": the status text
-            is conditional, and space-between would swing the actions across to
-            the left whenever nothing has been published yet. */}
-        <Group alignItems="center" gap="12" ml="auto">
-          {state.hasUnpublishedChanges && (
-            <Badge intent="warning">Unpublished changes</Badge>
-          )}
+        {state.hasUnpublishedChanges && (
+          <Badge intent="warning">Unpublished changes</Badge>
+        )}
 
-          <Button onClick={() => void state.save()} disabled={!state.dirty || state.saving}>
+        {showSave && (
+          <Button onClick={() => void state.save()} disabled={state.saving}>
             {state.saving ? 'Saving…' : 'Save draft'}
           </Button>
+        )}
 
-          {/* Publishing is the only action that changes the live site. */}
+        {/* Publishing is the only action that changes the live site. */}
+        {showPublish && (
           <Button
             appearance="primary"
             onClick={() => void state.publish()}
-            disabled={state.publishing || state.dirty}
-            title={state.dirty ? 'Save your draft before publishing' : 'Make the draft live'}
+            disabled={state.publishing}
+            title="Make the draft live"
           >
             {state.publishing ? 'Publishing…' : 'Publish'}
           </Button>
-        </Group>
-      </Group>
+        )}
+      </Box>
 
       {state.error && <Notice intent="danger">{state.error}</Notice>}
 

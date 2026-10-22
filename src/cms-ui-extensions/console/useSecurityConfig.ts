@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { ExtensionContext } from '@optimizely/cms-extensibility-sdk';
+import { toaster } from '@optiaxiom/react';
 
 import type { ConfigDocument, HeaderDto } from '../../shared/config.js';
 import {
@@ -39,7 +40,6 @@ export interface SecurityConfigState {
   readonly diagnostics: readonly Diagnostic[];
   readonly hasUnpublishedChanges: boolean;
   readonly publishedAt: string | undefined;
-  readonly publishedBy: string | undefined;
   /** What the site head is served right now. */
   readonly liveHeaders: readonly HeaderDto[];
   /** What publishing the current draft would produce. */
@@ -78,7 +78,6 @@ export function useSecurityConfig(
   const [diagnostics, setDiagnostics] = useState<readonly Diagnostic[]>([]);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
   const [publishedAt, setPublishedAt] = useState<string | undefined>(undefined);
-  const [publishedBy, setPublishedBy] = useState<string | undefined>(undefined);
   const [liveHeaders, setLiveHeaders] = useState<readonly HeaderDto[]>([]);
   const [pendingHeaders, setPendingHeaders] = useState<readonly HeaderDto[]>([]);
 
@@ -101,7 +100,6 @@ export function useSecurityConfig(
     setDiagnostics(status.diagnostics);
     setHasUnpublishedChanges(status.hasUnpublishedChanges);
     setPublishedAt(status.publishedAt);
-    setPublishedBy(status.publishedBy);
     setLiveHeaders(status.liveHeaders);
     setPendingHeaders(status.pendingHeaders);
     // Keyed on scopeKey rather than the scope object: its identity changes on
@@ -151,7 +149,10 @@ export function useSecurityConfig(
       const saved = await client.saveDraft(scope, config, revision);
       setRevision(saved.revision);
       setDirty(false);
-      setNotice('Draft saved. It is not live until you publish.');
+      // A toast rather than a notice: the status bar already shows the result
+      // persistently, so this only needs to acknowledge the click.
+      setNotice(undefined);
+      toaster.create('Draft saved. It is not live until you publish.', { intent: 'success' });
 
       // What publishing would emit has just changed. `hasUnpublishedChanges`
       // comes from the server's revision comparison rather than being assumed
@@ -182,16 +183,19 @@ export function useSecurityConfig(
       setDiagnostics(result.diagnostics);
       setHasUnpublishedChanges(false);
       setPublishedAt(result.publishedAt);
-      setPublishedBy(result.publishedBy);
       // Publishing makes pending the new live.
       setLiveHeaders(result.headers);
       setPendingHeaders(result.headers);
 
+      // The dropped-policy toast can afford to fade: the diagnostics panel
+      // carries the same warning persistently.
       const dropped = result.diagnostics.some((d) => d.code === 'policy-dropped');
-      setNotice(
+      setNotice(undefined);
+      toaster.create(
         dropped
           ? 'Published, but the Content Security Policy was too large to emit — see the warning below.'
-          : `Published ${result.headers.length} header${result.headers.length === 1 ? '' : 's'}.`
+          : `Published ${result.headers.length} header${result.headers.length === 1 ? '' : 's'}.`,
+        { intent: dropped ? 'warning' : 'success' }
       );
     } catch (cause) {
       setError(describe(cause));
@@ -253,7 +257,6 @@ export function useSecurityConfig(
     diagnostics,
     hasUnpublishedChanges,
     publishedAt,
-    publishedBy,
     liveHeaders,
     pendingHeaders,
     update,
