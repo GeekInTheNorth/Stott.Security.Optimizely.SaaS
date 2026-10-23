@@ -56,10 +56,9 @@ function SecurityConsole({ context }: { context: ExtensionContext }): React.JSX.
   // can be added without migrating documents, but nothing writes a narrower one.
   const scope = useMemo<Scope>(() => ({}), []);
 
-  // Publish attribution. The extension context carries no user identity, so
-  // this is a fixed label rather than a name — the alternative is asking the
-  // backend to invent one, which would be worse than an honest placeholder.
-  const state = useSecurityConfig(context, scope, 'cms-editor');
+  // No publish attribution: the extension context carries no user identity, and
+  // a fixed label in its place would record nothing about who acted.
+  const state = useSecurityConfig(context, scope);
 
   useEffect(() => {
     void context.extension.setReady();

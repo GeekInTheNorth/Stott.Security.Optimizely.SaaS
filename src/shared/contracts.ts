@@ -92,7 +92,6 @@ export interface ImportResult extends DraftResult {
 export interface PublishResult {
   readonly headers: readonly HeaderDto[];
   readonly publishedAt: string;
-  readonly publishedBy: string;
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -113,7 +112,6 @@ export interface IntegrationResult {
 export interface StatusResult {
   readonly hasUnpublishedChanges: boolean;
   readonly publishedAt?: string;
-  readonly publishedBy?: string;
   readonly liveHeaders: readonly HeaderDto[];
   readonly pendingHeaders: readonly HeaderDto[];
   readonly diagnostics: readonly Diagnostic[];

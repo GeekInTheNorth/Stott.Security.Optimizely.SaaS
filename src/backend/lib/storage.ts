@@ -44,7 +44,6 @@ interface StoredDocument extends KVHash {
 interface CompiledEnvelope extends KVHash {
   json: string;
   publishedAt: string;
-  publishedBy: string;
   /** Draft revision this was compiled from, so staleness is detectable. */
   sourceRevision: number;
 }
@@ -57,7 +56,6 @@ export interface DraftRecord {
 export interface CompiledRecord {
   readonly headers: readonly HeaderDto[];
   readonly publishedAt: string;
-  readonly publishedBy: string;
   readonly sourceRevision: number;
 }
 
@@ -216,14 +214,12 @@ export async function writeDraft(
 export async function writeCompiled(
   scope: Scope,
   headers: readonly HeaderDto[],
-  publishedBy: string,
   publishedAt: string,
   sourceRevision: number
 ): Promise<void> {
   await storage.kvStore.put<CompiledEnvelope>(compiledKey(scope), {
     json: JSON.stringify(headers),
     publishedAt,
-    publishedBy,
     sourceRevision
   });
 
@@ -247,7 +243,6 @@ export async function readCompiled(scope: Scope): Promise<CompiledRecord | undef
       return {
         headers: JSON.parse(stored.json) as HeaderDto[],
         publishedAt: stored.publishedAt,
-        publishedBy: stored.publishedBy,
         sourceRevision: stored.sourceRevision ?? 0
       };
     } catch (cause) {

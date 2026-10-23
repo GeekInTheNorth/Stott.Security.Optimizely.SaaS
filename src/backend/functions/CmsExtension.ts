@@ -49,7 +49,6 @@ interface RequestBody {
 interface ScopedParams extends Scope {
   config?: ConfigDocument;
   revision?: number;
-  actor?: string;
 }
 
 export class CmsExtension extends App.Function {
@@ -76,7 +75,7 @@ export class CmsExtension extends App.Function {
       }
 
       case Actions.Publish:
-        return ok(await this.publish(scope, params));
+        return ok(await this.publish(scope));
 
       case Actions.GetStatus:
         return ok(await this.getStatus(scope));
@@ -130,23 +129,16 @@ export class CmsExtension extends App.Function {
    * never does. Deliberate: an incorrect CSP breaks a site, so going live is an
    * explicit act.
    */
-  private async publish(scope: Scope, params: ScopedParams): Promise<PublishResult> {
-    const actor = params.actor?.trim();
-    if (!actor) {
-      throw new InvalidPayloadError('An `actor` is required to record who published.');
-    }
-
+  private async publish(scope: Scope): Promise<PublishResult> {
     const { config, revision } = await readDraft(scope);
     const { headers, diagnostics } = compileWithDiagnostics(config);
 
     const publishedAt = new Date().toISOString();
-    await writeCompiled(scope, headers, actor, publishedAt, revision);
+    await writeCompiled(scope, headers, publishedAt, revision);
 
-    logger.info(
-      `Published ${headers.length} header(s) for scope ${describeScope(scope)} by ${actor}.`
-    );
+    logger.info(`Published ${headers.length} header(s) for scope ${describeScope(scope)}.`);
 
-    return { headers, publishedAt, publishedBy: actor, diagnostics };
+    return { headers, publishedAt, diagnostics };
   }
 
   private async getStatus(scope: Scope): Promise<StatusResult> {
@@ -160,7 +152,6 @@ export class CmsExtension extends App.Function {
       // should be able to see that it has not gone live.
       hasUnpublishedChanges: live === undefined || live.sourceRevision !== revision,
       ...(live?.publishedAt ? { publishedAt: live.publishedAt } : {}),
-      ...(live?.publishedBy ? { publishedBy: live.publishedBy } : {}),
       liveHeaders: live?.headers ?? [],
       pendingHeaders,
       diagnostics

@@ -60,8 +60,7 @@ export interface SecurityConfigActions {
 
 export function useSecurityConfig(
   context: ExtensionContext,
-  scope: Scope,
-  actor: string
+  scope: Scope
 ): SecurityConfigState & SecurityConfigActions {
   const [client] = useState(() => createClient(context));
 
@@ -179,7 +178,7 @@ export function useSecurityConfig(
     setError(undefined);
 
     try {
-      const result = await client.publish(scope, actor);
+      const result = await client.publish(scope);
       setDiagnostics(result.diagnostics);
       setHasUnpublishedChanges(false);
       setPublishedAt(result.publishedAt);
@@ -202,7 +201,7 @@ export function useSecurityConfig(
     } finally {
       setPublishing(false);
     }
-  }, [actor, client, scope]);
+  }, [client, scope]);
 
   const exportDocument = useCallback(() => client.exportConfig(scope), [client, scope]);
 

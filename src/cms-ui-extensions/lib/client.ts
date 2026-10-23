@@ -105,8 +105,7 @@ export function createClient(context: ExtensionContext) {
       }),
 
     /** The only call that changes what the live site serves. */
-    publish: (scope: Scope, actor: string) =>
-      invoke<PublishResult>(context, Actions.Publish, { ...scope, actor }),
+    publish: (scope: Scope) => invoke<PublishResult>(context, Actions.Publish, { ...scope }),
 
     getStatus: (scope: Scope) => invoke<StatusResult>(context, Actions.GetStatus, { ...scope }),
 

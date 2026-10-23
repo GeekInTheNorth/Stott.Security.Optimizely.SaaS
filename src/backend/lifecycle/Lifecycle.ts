@@ -101,9 +101,7 @@ export class Lifecycle extends AppLifecycle {
           await writeCompiled(
             scope,
             compileHeaders(config),
-            // Preserve the original attribution — regeneration is not a publish
-            // by whoever triggered the upgrade.
-            previous?.publishedBy ?? 'system',
+            // Keep the original publish time — regeneration is not a publish.
             previous?.publishedAt ?? new Date().toISOString(),
             revision
           );
