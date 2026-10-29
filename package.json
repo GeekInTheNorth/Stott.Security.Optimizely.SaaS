@@ -19,26 +19,26 @@
     "validate": "npm run lint && npm run typecheck && npm run build && cross-env LOG_LEVEL=NEVER ocp-app-sdk validate"
   },
   "dependencies": {
-    "@optiaxiom/react": "^3.4.0",
+    "@optiaxiom/react": "^3.4.3",
     "@optimizely/cms-extensibility-sdk": "1.1.0",
     "@optimizely/ocp-cms-ui-extensions-sdk": "1.0.0",
-    "@tanstack/react-table": "^8.13.0",
-    "@zaiusinc/app-sdk": "3.5.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "@tanstack/react-table": "^8.21.3",
+    "@zaiusinc/app-sdk": "3.5.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@types/node": "^22.15.17",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^6.0.0",
-    "@zaiusinc/eslint-config-presets": "^3.1.0",
-    "cross-env": "^7.0.3",
-    "dotenv": "^16.5.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@zaiusinc/eslint-config-presets": "^3.1.3",
+    "cross-env": "^10.1.0",
+    "dotenv": "^18.0.9",
     "rimraf": "^6.0.1",
-    "typescript": "^5.8.3",
-    "vite": "^8.0.0",
-    "vite-plugin-css-injected-by-js": "^5.0.1",
-    "vitest": "^4.1.11"
+    "typescript": "~5.9.3",
+    "vite": "^8.3.5",
+    "vite-plugin-css-injected-by-js": "^5.0.3",
+    "vitest": "^5.0.5"
   }
 }

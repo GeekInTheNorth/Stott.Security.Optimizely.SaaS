@@ -27,6 +27,10 @@ import {
  *
  * Monospace and selectable — copying a header value out of here is a legitimate
  * thing for an editor to want.
+ *
+ * `overflow-wrap: anywhere` rather than `word-break: break-all`: header values
+ * can hold a source or URL longer than the panel is wide, which must still wrap,
+ * but prose and space-separated values should break between words.
  */
 export function Preview({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
@@ -36,7 +40,7 @@ export function Preview({ children }: { children: React.ReactNode }): React.JSX.
       fontFamily="mono"
       p="8"
       rounded="sm"
-      style={{ wordBreak: 'break-all' }}
+      style={{ overflowWrap: 'anywhere' }}
     >
       {children}
     </Box>

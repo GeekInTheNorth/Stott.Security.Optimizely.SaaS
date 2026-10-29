@@ -1,0 +1,13 @@
+{
+  "enabledPlugins": {
+    "ocp-skills@ocp-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "ocp-skills": {
+      "source": {
+        "source": "github",
+        "repo": "optimizely/ocp-skills"
+      }
+    }
+  }
+}

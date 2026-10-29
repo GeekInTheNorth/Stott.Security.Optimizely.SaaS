@@ -476,7 +476,9 @@ function HeaderCard({
 
         {row.behavior === CustomHeaderBehavior.Remove && (
           <Field label="Preview" w="full">
-            <Preview>If the header is present during processing, then an attempt to remove the header will be made.</Preview>
+            <Preview>
+              If the header is present during processing, then an attempt to remove the header will be made.
+            </Preview>
           </Field>
         )}
 
