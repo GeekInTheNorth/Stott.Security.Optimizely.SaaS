@@ -23,6 +23,13 @@ npm-debug.log*
 # Settings panel land here, so this must never be committed.
 .ocp-local/
 
+# Claude Code guidance. These are tracked — an ignore rule never untracks a file
+# git already has — but the OCP CLI packages a deploy from every file this list
+# does not exclude, and reads no other ignore file, so this is the only way to
+# keep them out of a publish. A new file under `.claude/` needs `git add -f`.
+.claude/
+CLAUDE.md
+
 # Test and tool caches
 coverage/
 .vitest/
